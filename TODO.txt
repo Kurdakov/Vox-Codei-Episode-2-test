@@ -1,0 +1,16 @@
+1. Obviously, Vox Codei 2 now has moving blocks, compared to static blocks in 
+so seems following things are needed:
+	a) have moving blocks which are aka blocks	in breakout (arkanoid) games
+	b) have multiple static maps on which it is easy to test bombs (like already done)
+	c) a loop to simulate life of bombs for 3 steps  so that nothing wrong goes - if goes - just backtrack - so 'mini simulator for 3 steps with moving blocks')
+	d) predict future positions of moving blocks ( basically blocks are moving by quite simple rules, so it is possible to predict their movements - blocks move
+	up down or left right, but also - are restricted either by walls/passive nodes(#)/other nodes ( which might disappear - so range of movements might change
+	during game )
+	e) to get initial conditions ( how blocks are moving ) we need to wait second step - after which we can compare maps and extract directions of blocks - seems
+	a first step to be done - finding directions and tracking if just second frame is always enough to predict )
+	e) instead of predicting bombs effects on the same map - predict them into future ( by removing nodes on 'statically' generated maps)
+	f) for plan - there is need not only place bomb but also indicate it's desired tick.
+	
+2.  From this follows that first step is that
+    code few maps and compare by this figuring directions for nodes, test on all test cases if that is enought, then it will be possible to create nodes with movements 	
+	
