@@ -40,22 +40,22 @@ typedef std::vector<row_t> grid_t;
 
 void formPattern(int x, int y, int width, int height, vector<vector<int>>& pattern, std::vector<std::vector<int>>& vectorpattern) {
 
-	vectorpattern[RIGHT] = {};
+	vectorpattern[RIGHT].clear();
 	for (int dx = 0; dx < 3 && x + dx < width; dx++)
 	{
 		vectorpattern[RIGHT].push_back(pattern[y][x + dx]); ;
 	}
-	vectorpattern[LEFT] = {};
+	vectorpattern[LEFT].clear();
 	for (int dx = 0; dx < 3 && x - dx >= 0; dx++)
 	{
 		vectorpattern[LEFT].push_back(pattern[y][x - dx]);
 	}
-	vectorpattern[DOWN] = {};
+	vectorpattern[DOWN].clear();
 	for (int dy = 0; dy < 3 && y + dy < height; dy++)
 	{
 		vectorpattern[DOWN].push_back(pattern[y+dy][x]);
 	}
-	vectorpattern[UP] = {};
+	vectorpattern[UP].clear();
 	for (int dy = 0; dy < 3 && y - dy >= 0; dy++)
 	{
 		vectorpattern[UP].push_back(pattern[y-dy][x]);
