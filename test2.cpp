@@ -38,36 +38,40 @@ typedef std::vector<EType> row_t;
 typedef std::vector<row_t> grid_t;
 
 
-void formPattern(int x, int y, int width, int height, vector<vector<int>>& pattern, std::vector<std::string>& stringpattern) {
+void formPattern(int x, int y, int width, int height, vector<vector<int>>& pattern, std::vector<std::vector<int>>& vectorpattern) {
 
-	stringpattern[RIGHT] = "";
+	vectorpattern[RIGHT] = {};
 	for (int dx = 0; dx < 3 && x + dx < width; dx++)
 	{
-		stringpattern[RIGHT] += std::to_string(pattern[y][x + dx]); ;
+		vectorpattern[RIGHT].push_back(pattern[y][x + dx]); ;
 	}
-	stringpattern[LEFT] = "";
+	vectorpattern[LEFT] = {};
 	for (int dx = 0; dx < 3 && x - dx >= 0; dx++)
 	{
-		stringpattern[LEFT] += std::to_string(pattern[y][x - dx]);
+		vectorpattern[LEFT].push_back(pattern[y][x - dx]);
 	}
-	stringpattern[DOWN] = "";
+	vectorpattern[DOWN] = {};
 	for (int dy = 0; dy < 3 && y + dy < height; dy++)
 	{
-		stringpattern[DOWN] += std::to_string(pattern[y+dy][x]);
+		vectorpattern[DOWN].push_back(pattern[y+dy][x]);
 	}
-	stringpattern[UP] = "";
+	vectorpattern[UP] = {};
 	for (int dy = 0; dy < 3 && y - dy >= 0; dy++)
 	{
-		stringpattern[UP] += std::to_string(pattern[y-dy][x]);
+		vectorpattern[UP].push_back(pattern[y-dy][x]);
 	}
 };
 
-int figurePattern(std::vector<std::string>&  stringpattern)
+const std::vector<int> pattern111 = { 1,1,1 };
+const std::vector<int> pattern21 = { 2,1 };
+const std::vector<int> pattern210 = { 2,1,0 };
+
+int figurePattern(std::vector<std::vector<int>>&  vectorpatterns)
 {
 	int found = -1;
 	for (int i = 0; i < 4; i++)
 	{
-		if (stringpattern[i] == "111" || stringpattern[i] == "21" || stringpattern[i] == "210")
+		if (vectorpatterns[i] == pattern111 || vectorpatterns[i] == pattern21 || vectorpatterns[i] == pattern210)
 		{
 			found = i;
 			break;
@@ -104,7 +108,8 @@ int main()
 
 //maps from step 8 of https://www.codingame.com/ide/puzzle/vox-codei-episode-2
 	string lstgrid1[] =
-	{   "........@...",
+	{   
+		"........@...",
 		".......@....",
 		".#.#.#@#.#.#",
 		".....@......",
@@ -116,7 +121,8 @@ int main()
 	};
 
 	string lstgrid2[] =
-	{   ".......@....",
+	{   
+		".......@....",
 		"........@...",
 		".#.#.#.#.#.#",
 		"....@.@.....",
@@ -127,7 +133,8 @@ int main()
 		".@..........",
 	};
 	string lstgrid3[] =
-	{   "......@.....",
+	{   
+		"......@.....",
 		".........@..",
 		".#.#@#.#.#.#",
 		".......@....",
@@ -223,7 +230,7 @@ int main()
 	}
 	
 //figure directions for for particular node	
-	std::vector<std::string> stringpatterns{ ""/*UP*/, "" /*RIGHT*/, "" /*DOWN*/, ""/*LEFT*/ };
+	std::vector<std::vector<int>> vectorpatterns{ {}/*UP*/, {} /*RIGHT*/, {} /*DOWN*/, {}/*LEFT*/ };
 	int direction;
 	for (int y = 0; y < height; y++)//
 	{
@@ -231,10 +238,10 @@ int main()
 		{
 			if (grid1[y][x] == ET_NODE) {
 
-				formPattern(x, y, width, height, pattern, stringpatterns);
+				formPattern(x, y, width, height, pattern, vectorpatterns);
 				//TODO - retrieve assosiated node from GameField
 				//figure pattern, pass to node
-				direction = figurePattern(stringpatterns);//pass direction to corresponding node 
+				direction = figurePattern(vectorpatterns);//pass direction to corresponding node 
 				if (direction == -1)
 				{
 					cerr << "no direction found for" << y << " " << x << endl;
@@ -246,3 +253,5 @@ int main()
 	}
 
 }
+
+//TODO - statics == 3 
