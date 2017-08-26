@@ -1,4 +1,4 @@
-1. Obviously, Vox Codei 2 now has moving blocks, compared to static blocks in 
+1. Obviously, Vox Codei 2 now has moving blocks, compared to static blocks in Vox Codei 1
 so seems following things are needed:
 	a) have moving blocks which are aka blocks	in breakout (arkanoid) games
 	b) have multiple static maps on which it is easy to test bombs (like already done)
@@ -13,4 +13,16 @@ so seems following things are needed:
 	
 2.  From this follows that first step is that
     code few maps and compare by this figuring directions for nodes, test on all test cases if that is enought, then it will be possible to create nodes with movements 	
+3.  update 26.08.2017 
+    for now: test2.cpp finds directions, test1.cpp provides a way for 'parametric' computation of node positions for entire game, given initial conditions
+    now steps looks like following
+    	- create moving blocks with appropriate params (initial position, the moving boundaries due to walls) from initial date, have 'render' method to
+		render successive maps for bomb drops
+		- due to parametric computation of positions it will be possible just to repeat Vox Codei 1 brute force approach to analyse successive maps,
+		- there will be need, though, to keep track of 'killed' dynamically created blocks. One approach is - instead of just providing new maps by copying them (like in Vox Codei 1) in recursive search -
+		it is possible to copy blocks and then make them 'render' successive maps - so 'moving blocks' should live more or less independent life from main 'simulation' class.
+		- possibly there will be (unlike first game, where all computations were done before first output of command) time limit on depth of search. 
+		So successive deepening likely won't give final solution, but should at least answer following question - wait at this step, or apply current
+		best bomb, hopefully it will be possible to figure answer to this quesion in one computational step time ( 0.1 sec as I understand )
+	
 	
