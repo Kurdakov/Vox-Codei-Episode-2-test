@@ -12,6 +12,31 @@
 
 using namespace std;
 
+int pingpong(int time, int length)
+{
+	int L = 2 * length;
+	int T = time % L;
+	int x = L - T;
+
+
+	if (T < length)
+	{
+		return T;
+	}
+	else
+	{
+		return L - T;
+	}
+
+}
+
+enum Directions
+{
+	UP = 0,
+	RIGHT,
+	DOWN,
+	LEFT,
+};
 
 class Node {
 public:
@@ -22,7 +47,7 @@ public:
 
 	enum NodeType
 	{
-		HORIZONAL = 0,
+		HORIZONTAL = 0,
 		VERTICAL,
 		STATIC,
 	};
@@ -30,7 +55,9 @@ public:
 	int initX, initY;
 	int bound1X, bound1Y;//left/top bound
 	int bound2X, bound2Y;//right/bottom bound
+	int additionalTimefornode;//fake 'time' to fit into pingpong function
 	NodeType m_type;
+	int width;
 
 	void computePosOnFrame(int frameNum) {};
 	void renderToMap() {};
@@ -38,6 +65,42 @@ public:
 	{
 		initX = _initX;
 		initY = _initY;
+	}
+	void initHorizontalBoundaries(Directions dir,int travelWidth,int leftBoundary=-1, int rightBoundary=-1)
+	{
+		m_type = HORIZONTAL;
+		if (leftBoundary == -1 && rightBoundary == -1)
+		{//no boundaries
+			width = travelWidth;
+			if (dir == RIGHT)
+			{
+				additionalTimefornode = initX;
+			}
+			else
+			{//LEFT
+				additionalTimefornode = 2*travelWidth - initX;
+			}
+
+		}
+
+	}
+	void initVerticalBoundaries(Directions dir, int travelWidth, int topBoundary = -1, int bottomBoundary = -1)
+	{
+		m_type = VERTICAL;
+		if (topBoundary == -1 && bottomBoundary == -1)
+		{//no boundaries
+			width = travelWidth;
+			if (dir == UP)
+			{
+				additionalTimefornode = initY;
+			}
+			else
+			{//LEFT
+				additionalTimefornode = 2 * travelWidth - initY;
+			}
+
+		}
+
 	}
 
 
@@ -101,6 +164,7 @@ typedef std::vector<vector<int>> intgrid_t;
 typedef std::vector<vector<Node*>> nodegrid_t;
 
 
+
 class GameField {
 public:
 	int width, height;
@@ -123,7 +187,7 @@ struct Possibility
 class Detection {
 public:
 	string* initListInt;
-	grid_t grid[3];//detection frames
+	//grid_t grid[3];//detection frames
 	intgrid_t patterngrid;
 	intgrid_t passivenodesgrid;
 	vector<bool> hasObstaclesInRow;//y - height -> row change
@@ -134,13 +198,9 @@ public:
 	const std::vector<int> pattern21 = { 2,1 };
 	const std::vector<int> pattern210 = { 2,1,0 };
 
-	enum Directions
-	{
-		UP = 0,
-		RIGHT,
-		DOWN,
-		LEFT,
-	};
+	std::vector<string> firstFrameList;
+
+	
 
 
 	Detection(int _width, int _height, vector<string>& initList)
@@ -148,16 +208,16 @@ public:
 		width = _width;
 		height = _height;
 
-		grid[0].resize(height);
-		grid[1].resize(height);
-		grid[2].resize(height);
+		//grid[0].resize(height);
+		//grid[1].resize(height);
+		//grid[2].resize(height);
 		hasObstaclesInRow.resize(height);
 		hasObstaclesInColumns.resize(width);
 		patterngrid.resize(height);
 		passivenodesgrid.resize(height);
 		initNodeGrid.resize(height);
 
-
+		firstFrameList = initList;
 
 		//width x height y
 		//initListInt = initList;
@@ -165,9 +225,7 @@ public:
 			string mapRow; // one line of the firewall grid
 						   //cin >> mapRow; cin.ignore();
 			mapRow = initList[y];
-			grid[0][y].resize(width);
-			grid[1][y].resize(width);
-			grid[2][y].resize(width);
+
 			patterngrid[y].resize(width);
 			passivenodesgrid[y].resize(width);
 			initNodeGrid[y].resize(width);
@@ -231,26 +289,108 @@ public:
 			}
 
 		}
-		//now have all frames
+		//now have all frames, compute patterns relative to first frame
 		std::vector<std::vector<int>> vectorpatterns{ {}/*UP*/,{} /*RIGHT*/,{} /*DOWN*/,{}/*LEFT*/ };
 		int direction;
 		for (int y = 0; y < height; y++)//
 		{
 			string mapRow; // one line of the firewall grid
 						   //cin >> mapRow; cin.ignore();
-			mapRow = initList[y];
+			mapRow = firstFrameList[y];
 			for (int x = 0; x < width; x++)//first wee look at horizontal line
 			{
 				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
 				if (celltype == CellType::ET_NODE) {
 
 					formPattern(x, y, width, height,  vectorpatterns);
-					//TODO - retrieve assosiated node from GameField
+					
 					//figure pattern, pass to node
 					direction = figurePattern(vectorpatterns);//pass direction to corresponding node 
 					if (direction == -1)
 					{
 						cerr << "no direction found for" << y << " " << x << endl;
+					}
+					//now check boundaries
+					switch (direction)
+					{
+					case UP: 
+					case DOWN:
+						//check if there are passive nodes in column
+						if (hasObstaclesInColumns[x])
+						{
+							int topObstacle = -1;
+							int bottomObstacle = -1;
+							bool stop = true;
+							//check left
+							int i = y - 1;
+							while (i > -1)
+							{
+								int topIndex = passivenodesgrid[y][i--];
+								if (topIndex)
+								{
+									topObstacle = i + 1;
+									break;
+								}
+							};
+							i = y + 1;
+							while (i < height)
+							{
+								int bottomIndex = passivenodesgrid[y][i++];
+								if (bottomIndex)
+								{
+									bottomObstacle = i - 1;
+									break;
+								}
+							};
+							//if(leftObstacle==-1)//no left obstacle
+							initNodeGrid[y][x]->initVerticalBoundaries(static_cast<Directions>(direction), height, topObstacle, bottomObstacle);
+
+						}
+						else
+						{
+							initNodeGrid[y][x]->initVerticalBoundaries(static_cast<Directions>(direction), height);
+						}
+						break;
+					case LEFT:
+					case RIGHT:
+						if (hasObstaclesInRow[y])
+						{
+							int leftObstacle = -1;
+							int rigthObstacle = -1;
+							bool stop = true;
+							//check left
+							int i = x-1;
+							while (i > -1)
+							{
+								int leftIndex = passivenodesgrid[y][i--];
+								if (leftIndex)
+								{
+									leftObstacle = i + 1;
+									break;
+								}
+							};
+							i = x + 1;
+							while (i < width) 
+							{
+								int rightIndex = passivenodesgrid[y][i++];
+								if (rightIndex)
+								{
+									rigthObstacle = i - 1;
+									break;
+								}
+							};
+							//if(leftObstacle==-1)//no left obstacle
+							initNodeGrid[y][x]->initHorizontalBoundaries(static_cast<Directions>(direction),width, leftObstacle, rigthObstacle);
+
+						}
+						else
+						{
+							initNodeGrid[y][x]->initHorizontalBoundaries(static_cast<Directions>(direction), width);
+						}
+
+						break;
+
+						
 					}
 
 				}
@@ -331,71 +471,16 @@ public:
 
 	}
 
-	grid_t detectionFrames[3];
 
-	void setFrame(grid_t& frame, int step) {};
+
 
 };
 
 
-template<typename T>
-vector<T> splice(vector<T>& v, int start, int howmuch) {
-	vector<T> result(begin(v) + start, begin(v) +  howmuch);
-	v.erase(begin(v) + start, begin(v)  + howmuch);
-	return result;
-}
 
-void clone(grid_t& grid, grid_t& newgrid)
-{
-	std::copy(grid.begin(), grid.end(), back_inserter(newgrid));
-}
-int countNodes(grid_t& grid)
-{
-	int count=0;
-	for (size_t i = 0; i < grid.size(); i++)
-	{
-		for (size_t j = 0; j < grid[i].size(); j++)
-		{
-			if (grid[i][j] == CellType::ET_NODE)
-			{
-				count++;
-			}
-		}
-	}
 
-	return count;
-}
 
-void dump_map(const grid_t& m)
-{
-	for (size_t i = 0; i < m.size(); i++)
-	{
-		for (size_t j = 0; j < m[i].size(); j++)
-		{
-			std::cerr << static_cast<char>(m[i][j].GetType());
-		}
-		std::cerr << std::endl;
-	}
-}
 
-/**
-* Decrement countdown for future exploded nodes
-* @param {grid_t} grid containing nodes and walls
-*/
-void purgeGrid(grid_t& grid) {
-	for (size_t i = 0; i < grid.size(); i++)
-	{
-		for (size_t j = 0; j < grid[i].size(); j++)
-		{
-			if(grid[i][j] == CellType::BOMB_1  || grid[i][j] == CellType::BOMB_2 ||  grid[i][j] == CellType::BOMB_3)
-			{
-				grid[i][j].DecreaseTypeValue();
-				grid[i][j].SetType((grid[i][j] == CellType::BOMB_0) ? CellType::ET_EMPTY : grid[i][j].GetType());
-			}
-		}
-	}
-
-}
 
 
 
