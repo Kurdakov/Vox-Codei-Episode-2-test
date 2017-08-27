@@ -8,18 +8,30 @@
 #include <list>
 #include <iterator>
 #include <deque>
+#include <memory>
 
 using namespace std;
 
 
 class Node {
 public:
+	Node(int _initX,int _initY):initX(_initX),initY(_initY)
+	{};
+	Node()
+	{};
+
+
 	int initX, initY;
 	int bound1X, bound1Y;//left/top bound
 	int bound2X, bound2Y;//right/bottom bound
 
 	void computePosOnFrame(int frameNum) {};
 	void renderToMap() {};
+	void setXY(int _initX, int _initY)
+	{
+		initX = _initX;
+		initY = _initY;
+	}
 
 
 };
@@ -77,6 +89,9 @@ typedef std::vector<CellType> row_t;
 typedef std::vector<row_t> grid_t;
 typedef std::pair<int, int> node_t;
 typedef std::list<node_t> nodes_list_t;
+typedef std::vector<vector<int>> intgrid_t;
+typedef std::vector<vector<Node*>> nodegrid_t;
+
 
 class GameField {
 public:
@@ -99,8 +114,89 @@ struct Possibility
 
 class Detection {
 public:
-	Detection(int width, int height) {};
-	~Detection() {};
+	string* initListInt;
+	grid_t grid[3];//detection frames
+	intgrid_t patterngrid;
+	intgrid_t passivenodesgrid;
+	vector<bool> hasObstaclesInRow;//y - height -> row change
+	vector<bool> hasObstaclesInColumns;//x - width -> column change
+	nodegrid_t initNodeGrid;
+	int width, height;
+
+
+	Detection(int _width, int _height, string initList[])
+	{
+		width = _width;
+		height = _height;
+
+		grid[0].resize(height);
+		grid[1].resize(height);
+		grid[2].resize(height);
+		hasObstaclesInRow.resize(height);
+		hasObstaclesInColumns.resize(width);
+		patterngrid.resize(height);
+		passivenodesgrid.resize(height);
+		initNodeGrid.resize(height);
+
+
+
+		//width x height y
+		initListInt = initList;
+		for (int y = 0; y < height; y++) {
+			string mapRow; // one line of the firewall grid
+						   //cin >> mapRow; cin.ignore();
+			mapRow = initListInt[y];
+			grid[0][y].resize(width);
+			grid[1][y].resize(width);
+			grid[2][y].resize(width);
+			patterngrid[y].resize(width);
+			passivenodesgrid[y].resize(width);
+			initNodeGrid[y].resize(width);
+
+			for (int x = 0; x < width; x++)
+			{
+				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
+				//grid[0][i][j].SetType(celltype);
+				if (celltype == CellType::ET_NODE)
+				{
+					patterngrid[y][x]++;
+					initNodeGrid[y][x]= new Node(x, y);
+				}
+				if (celltype == CellType::ET_PASSIVE)
+				{
+					passivenodesgrid[y][x]++;
+					hasObstaclesInRow[y] = true;
+					hasObstaclesInColumns[x] = true;
+				}
+
+			}
+
+		}
+
+	};
+	~Detection() 
+	{
+		for (int y = 0; y < height; y++) 
+		{
+			for (int x = 0; x < width; x++)
+			{
+
+				if (initNodeGrid[y][x] != NULL)
+				{
+					delete initNodeGrid[y][x];
+				}
+
+
+			}
+		}
+
+	};
+
+	shared_ptr<GameField> createGameField()
+	{
+		//find nodes and their boundaries
+
+	}
 
 	grid_t detectionFrames[3];
 
@@ -182,35 +278,60 @@ int main()
 	int width; // width of the firewall grid
 	int height; // height of the firewall grid
 	//cin >> width >> height; cin.ignore();
-	width = 8; height = 6;
+	
+	//test with test 7 of Vox Codei
+	width = 12;
+	height = 9;
 
 
 
-	grid_t grid(height);
 
-   string list[] = { 
-		"........",
-		"......@.",
-		"@@@.@@@@",
-		"......@.",
-		"........",
-		"........",
+	
+	
+
+	string initList[] = 
+	{
+		"........@...",
+		".......@....",
+		".#....@...#.",
+		".....@......",
+		"....@.......",
+		"...@........",
+		"..@.........",
+		"#@.......#..",
+		"@...........",
 	};
-	//debug
+	/*
+	 {
+		 ".......@....",
+		 "........@...",
+		 ".#........#.",
+		 "....@.@.....",
+		 "............",
+		 "..@.........",
+		 "...@........",
+		 "#.@......#..",
+		 ".@..........",
+	 },
+	 {
+		 "......@.....",
+		 ".........@..",
+		 ".#..@.....#.",
+		 ".......@....",
+		 "......@.....",
+		 ".@..........",
+		 "....@.......",
+		 "#..@.....#..",
+		 "..@.........",
+	 }
+	};
+	*/
+	
+	//create game field and make initialization
+	Detection detection(width, height, initList);
 
-
-	for (int i = 0; i < height; i++) {
-		string mapRow; // one line of the firewall grid
-		//cin >> mapRow; cin.ignore();
-		mapRow = list[i];
-		grid[i].resize(width);
-		for (int j = 0; j < width; j++)
-		{
-			grid[i][j].SetType(static_cast<CellType::EType>(mapRow[j]));
-		}
-		
-	}
-	dump_map(grid);
+	
+	//dump_map(grid);
 	
 	vector<Possibility>* seq = NULL;
 	// game loop
@@ -222,9 +343,10 @@ int main()
 		//cin >> rounds >> bombs; cin.ignore();
 		//cerr << "rounds " << rounds << "bombs " << bombs << endl;
 
-		purgeGrid(grid);
+		
 		std::cout << "WAIT" << std::endl;
+		rounds--;
 	}
-	rounds--;
+	
 		
 }
