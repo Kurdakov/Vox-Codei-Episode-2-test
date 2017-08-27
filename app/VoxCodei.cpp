@@ -20,10 +20,17 @@ public:
 	Node()
 	{};
 
+	enum NodeType
+	{
+		HORIZONAL = 0,
+		VERTICAL,
+		STATIC,
+	};
 
 	int initX, initY;
 	int bound1X, bound1Y;//left/top bound
 	int bound2X, bound2Y;//right/bottom bound
+	NodeType m_type;
 
 	void computePosOnFrame(int frameNum) {};
 	void renderToMap() {};
@@ -32,6 +39,7 @@ public:
 		initX = _initX;
 		initY = _initY;
 	}
+
 
 
 };
@@ -122,9 +130,20 @@ public:
 	vector<bool> hasObstaclesInColumns;//x - width -> column change
 	nodegrid_t initNodeGrid;
 	int width, height;
+	const std::vector<int> pattern111 = { 1,1,1 };
+	const std::vector<int> pattern21 = { 2,1 };
+	const std::vector<int> pattern210 = { 2,1,0 };
+
+	enum Directions
+	{
+		UP = 0,
+		RIGHT,
+		DOWN,
+		LEFT,
+	};
 
 
-	Detection(int _width, int _height, string initList[])
+	Detection(int _width, int _height, vector<string>& initList)
 	{
 		width = _width;
 		height = _height;
@@ -141,11 +160,11 @@ public:
 
 
 		//width x height y
-		initListInt = initList;
+		//initListInt = initList;
 		for (int y = 0; y < height; y++) {
 			string mapRow; // one line of the firewall grid
 						   //cin >> mapRow; cin.ignore();
-			mapRow = initListInt[y];
+			mapRow = initList[y];
 			grid[0][y].resize(width);
 			grid[1][y].resize(width);
 			grid[2][y].resize(width);
@@ -174,6 +193,120 @@ public:
 		}
 
 	};
+	//add second frame
+	void addSecondFrame(vector<string>& initList)
+	{
+		for (int y = 0; y < height; y++)//
+		{
+			string mapRow; // one line of the firewall grid
+						   //cin >> mapRow; cin.ignore();
+			mapRow = initList[y];
+			for (int x = 0; x < width; x++)//first wee look at horizontal line
+			{
+				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
+				if (celltype == CellType::ET_NODE)
+				{
+					patterngrid[y][x]++;
+					
+				}
+			}
+
+		}
+	}
+	void addThirdFrame(vector<string>& initList)
+	{
+		for (int y = 0; y < height; y++)//
+		{
+			string mapRow; // one line of the firewall grid
+						   //cin >> mapRow; cin.ignore();
+			mapRow = initList[y];
+			for (int x = 0; x < width; x++)//first wee look at horizontal line
+			{
+				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
+				if (celltype == CellType::ET_NODE)
+				{
+					patterngrid[y][x]++;
+
+				}
+			}
+
+		}
+		//now have all frames
+		std::vector<std::vector<int>> vectorpatterns{ {}/*UP*/,{} /*RIGHT*/,{} /*DOWN*/,{}/*LEFT*/ };
+		int direction;
+		for (int y = 0; y < height; y++)//
+		{
+			string mapRow; // one line of the firewall grid
+						   //cin >> mapRow; cin.ignore();
+			mapRow = initList[y];
+			for (int x = 0; x < width; x++)//first wee look at horizontal line
+			{
+				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
+				if (celltype == CellType::ET_NODE) {
+
+					formPattern(x, y, width, height,  vectorpatterns);
+					//TODO - retrieve assosiated node from GameField
+					//figure pattern, pass to node
+					direction = figurePattern(vectorpatterns);//pass direction to corresponding node 
+					if (direction == -1)
+					{
+						cerr << "no direction found for" << y << " " << x << endl;
+					}
+
+				}
+			}
+
+		}
+
+
+
+	}
+
+	void formPattern(int x, int y, int width, int height,  std::vector<std::vector<int>>& vectorpattern) 
+	{
+
+		vectorpattern[RIGHT].clear();
+		for (int dx = 0; dx < 3 && x + dx < width; dx++)
+		{
+			vectorpattern[RIGHT].push_back(patterngrid[y][x + dx]); ;
+		}
+		vectorpattern[LEFT].clear();
+		for (int dx = 0; dx < 3 && x - dx >= 0; dx++)
+		{
+			vectorpattern[LEFT].push_back(patterngrid[y][x - dx]);
+		}
+		vectorpattern[DOWN].clear();
+		for (int dy = 0; dy < 3 && y + dy < height; dy++)
+		{
+			vectorpattern[DOWN].push_back(patterngrid[y + dy][x]);
+		}
+		vectorpattern[UP].clear();
+		for (int dy = 0; dy < 3 && y - dy >= 0; dy++)
+		{
+			vectorpattern[UP].push_back(patterngrid[y - dy][x]);
+		}
+	};
+
+	int figurePattern(std::vector<std::vector<int>>&  vectorpatterns)
+	{
+		int found = -1;
+		for (int i = 0; i < 4; i++)
+		{
+			if (vectorpatterns[i] == pattern111 || vectorpatterns[i] == pattern21 || vectorpatterns[i] == pattern210)
+			{
+				found = i;
+				break;
+				//to node - i is a direction of initial node movement
+			}
+		}
+		if (found == -1)
+		{
+			//error - pattern is not found
+			bool stop = true;
+		}
+		return found;
+	}
+
 	~Detection() 
 	{
 		for (int y = 0; y < height; y++) 
@@ -282,14 +415,8 @@ int main()
 	//test with test 7 of Vox Codei
 	width = 12;
 	height = 9;
-
-
-
-
 	
-	
-
-	string initList[] = 
+	vector<string> initList =
 	{
 		"........@...",
 		".......@....",
@@ -301,43 +428,78 @@ int main()
 		"#@.......#..",
 		"@...........",
 	};
-	/*
-	 {
-		 ".......@....",
-		 "........@...",
-		 ".#........#.",
-		 "....@.@.....",
-		 "............",
-		 "..@.........",
-		 "...@........",
-		 "#.@......#..",
-		 ".@..........",
-	 },
-	 {
-		 "......@.....",
-		 ".........@..",
-		 ".#..@.....#.",
-		 ".......@....",
-		 "......@.....",
-		 ".@..........",
-		 "....@.......",
-		 "#..@.....#..",
-		 "..@.........",
-	 }
-	};
-	*/
+	
+	
 	
 	//create game field and make initialization
-	Detection detection(width, height, initList);
+	//Detection detection(width, height, initList);
 
+	shared_ptr<Detection> pDetection(nullptr);
 	
 	//dump_map(grid);
-	
-	vector<Possibility>* seq = NULL;
+	//vector<string> initList;
+
 	// game loop
-	int rounds = 15;
-	int bombs = 3;
-	while (rounds > -1) {
+	int simrounds = 1;
+	int initrounds = 0;
+
+	while (simrounds < 5) {
+		/*
+		int rounds; // number of rounds left before the end of the game
+		int bombs; // number of bombs left
+		cin >> rounds >> bombs; cin.ignore();
+		cerr << "bombs " << bombs << endl;
+		initList.clear();
+		for (int i = 0; i < height; i++) {
+			string mapRow; // one line of the firewall grid
+			getline(cin, mapRow);
+			//add mapRow to array
+			initList.push_back(mapRow);
+			cerr << "mapRow " << i << " " << mapRow << endl;
+		}
+		*/
+		switch (simrounds)
+		{
+		case 1:
+			//init
+			//initrounds = rounds;
+			pDetection.reset(new Detection(width, height, initList));
+			break;
+		case 2:
+			initList = {
+				".......@....",
+				"........@...",
+				".#........#.",
+				"....@.@.....",
+				"............",
+				"..@.........",
+				"...@........",
+				"#.@......#..",
+				".@..........",
+			};
+			//add second frame
+			pDetection->addSecondFrame(initList);
+			break;
+		case 3:
+			//add third frame, init all
+			initList = {
+				"......@.....",
+				".........@..",
+				".#..@.....#.",
+				".......@....",
+				"......@.....",
+				".@..........",
+				"....@.......",
+				"#..@.....#..",
+				"..@.........",
+			};
+			pDetection->addThirdFrame(initList);
+			break;
+		default:
+			//simulate
+			break;
+
+		}
 		//int rounds; // number of rounds left before the end of the game
 		//int bombs; // number of bombs left
 		//cin >> rounds >> bombs; cin.ignore();
@@ -345,7 +507,7 @@ int main()
 
 		
 		std::cout << "WAIT" << std::endl;
-		rounds--;
+		simrounds++;
 	}
 	
 		
