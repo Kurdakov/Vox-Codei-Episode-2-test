@@ -9,6 +9,7 @@
 #include <iterator>
 #include <deque>
 #include <memory>
+#include <fstream>
 
 using namespace std;
 
@@ -18,7 +19,6 @@ int pingpong(int time, int length)
 	int T = time % L;
 	int x = L - T;
 
-
 	if (T < length)
 	{
 		return T;
@@ -27,7 +27,6 @@ int pingpong(int time, int length)
 	{
 		return L - T;
 	}
-
 }
 
 enum Directions
@@ -53,11 +52,14 @@ public:
 	};
 
 	int initX, initY;
-	int bound1X, bound1Y;//left/top bound
-	int bound2X, bound2Y;//right/bottom bound
+	
 	int additionalTimefornode;//fake 'time' to fit into pingpong function
 	NodeType m_type;
 	int width;
+	int leftRange, topRange;
+	int travelRange;
+	int pos;
+	int curX, curY;
 
 	void computePosOnFrame(int frameNum) {};
 	void renderToMap() {};
@@ -71,7 +73,9 @@ public:
 		m_type = HORIZONTAL;
 		if (leftBoundary == -1 && rightBoundary == -1)
 		{//no boundaries
+			
 			width = travelWidth;
+			leftRange = 0;
 			if (dir == RIGHT)
 			{
 				additionalTimefornode = initX;
@@ -80,25 +84,83 @@ public:
 			{//LEFT
 				additionalTimefornode = 2*travelWidth - initX;
 			}
-
 		}
+		if (leftBoundary != -1 && rightBoundary != -1)
+		{
+			width = rightBoundary;//travel to boundary but not on boundary -1?!
+			travelRange = width - leftBoundary;
+			leftRange = leftBoundary;
+			if (dir == LEFT)
+			{
+				additionalTimefornode = travelRange + (travelRange - (initX - leftBoundary));
+			}
+			else
+			{//RIGHT
+				additionalTimefornode = initX - leftBoundary;
+			}
+		}
+		if (leftBoundary != -1 && rightBoundary == -1)
+		{
+			travelRange = width - leftBoundary;
+			if (dir == LEFT)
+			{
+				additionalTimefornode = travelRange + (travelRange - (initX - leftBoundary));
+			}
+			else
+			{//RIGHT
+				additionalTimefornode = initX - leftBoundary;
+			}
+		}
+		if (leftBoundary == -1 && rightBoundary != -1)
+		{
+			travelRange = width - rightBoundary;
+			if (dir == LEFT)
+			{
+				additionalTimefornode = travelRange + (travelRange - initX);
+			}
+			else
+			{//RIGHT
+				additionalTimefornode = initX;
+			}
+		}
+
 
 	}
 	void initVerticalBoundaries(Directions dir, int travelWidth, int topBoundary = -1, int bottomBoundary = -1)
 	{
 		m_type = VERTICAL;
 		if (topBoundary == -1 && bottomBoundary == -1)
-		{//no boundaries
+		{//no boundaries 
 			width = travelWidth;
-			if (dir == UP)
+			topRange = 0;
+			if (dir == DOWN)
 			{
 				additionalTimefornode = initY;
 			}
 			else
-			{//LEFT
+			{//UP
 				additionalTimefornode = 2 * travelWidth - initY;
 			}
+		}
+		//TODO add for vertical travelRange compute
 
+
+	}
+
+	void computePosForFrame(int frame)
+	{
+		
+		if (m_type == HORIZONTAL)
+		{
+			pos = leftRange + pingpong((frame - 1) + additionalTimefornode, width);
+			curX = pos;
+			curY = initY;
+		}
+		if (m_type == VERTICAL)
+		{
+			pos = topRange + pingpong((frame - 1) + additionalTimefornode, width);
+			curY = pos;
+			curX = initX;
 		}
 
 	}
@@ -200,6 +262,8 @@ public:
 
 	std::vector<string> firstFrameList;
 
+	std::deque<Node*> nodesDeque;
+
 	
 
 
@@ -288,6 +352,20 @@ public:
 				}
 			}
 
+		};
+		std::fstream of("Map.txt", std::ios::out | std::ios::trunc);
+
+		if (of.is_open())
+		{
+			for (int y = 0; y < height; ++y)
+			{
+				for (int x = 0; x < width; ++x)
+				{
+					of << patterngrid[y][x] << " ";
+				}
+				of << "\n";
+			}
+			of.close();
 		}
 		//now have all frames, compute patterns relative to first frame
 		std::vector<std::vector<int>> vectorpatterns{ {}/*UP*/,{} /*RIGHT*/,{} /*DOWN*/,{}/*LEFT*/ };
@@ -389,10 +467,13 @@ public:
 						}
 
 						break;
-
 						
 					}
 
+				}
+				if (initNodeGrid[y][x] != NULL)
+				{
+					nodesDeque.push_back(initNodeGrid[y][x]);
 				}
 			}
 
@@ -582,6 +663,16 @@ int main()
 			break;
 		default:
 			//simulate
+			//test so far
+			for (int frame = 1; frame <= 22; frame++)
+			{
+				for (Node* pNode : pDetection->nodesDeque)
+				{
+					pNode->computePosForFrame(frame);
+					bool stop = true;
+				}
+				bool stop = true;
+			}
 			break;
 
 		}
@@ -589,7 +680,7 @@ int main()
 		//int bombs; // number of bombs left
 		//cin >> rounds >> bombs; cin.ignore();
 		//cerr << "rounds " << rounds << "bombs " << bombs << endl;
-
+		//test
 		
 		std::cout << "WAIT" << std::endl;
 		simrounds++;
