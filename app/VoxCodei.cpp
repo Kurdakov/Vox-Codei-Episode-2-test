@@ -35,6 +35,7 @@ enum Directions
 	RIGHT,
 	DOWN,
 	LEFT,
+	UNDECIDED,
 };
 
 class Node {
@@ -49,6 +50,7 @@ public:
 		HORIZONTAL = 0,
 		VERTICAL,
 		STATIC,
+		NOTDETECTED,
 	};
 
 	int initX, initY;
@@ -68,13 +70,24 @@ public:
 		initX = _initX;
 		initY = _initY;
 	}
+
+	void initUndecided()
+	{
+		m_type = NOTDETECTED;
+	}
+
+	void initStatic()
+	{
+		m_type = STATIC;
+	}
+
 	void initHorizontalBoundaries(Directions dir,int travelWidth,int leftBoundary=-1, int rightBoundary=-1)
 	{
 		m_type = HORIZONTAL;
 		if (leftBoundary == -1 && rightBoundary == -1)
 		{//no boundaries
 			
-			width = travelWidth;
+			width = travelWidth-1;//0 -
 			leftRange = 0;
 			if (dir == RIGHT)
 			{
@@ -82,38 +95,43 @@ public:
 			}
 			else
 			{//LEFT
-				additionalTimefornode = 2*travelWidth - initX;
+				additionalTimefornode = 2* width - initX;
 			}
 		}
 		if (leftBoundary != -1 && rightBoundary != -1)
 		{
-			width = rightBoundary;//travel to boundary but not on boundary -1?!
-			travelRange = width - leftBoundary;
-			leftRange = leftBoundary;
+			
+			travelRange = (rightBoundary - 1) - (leftBoundary+1);
+			width = travelRange;//travel to boundary but not on boundary -1?!
+			leftRange = leftBoundary+1;
 			if (dir == LEFT)
 			{
-				additionalTimefornode = travelRange + (travelRange - (initX - leftBoundary));
+				additionalTimefornode = travelRange + (travelRange - (initX - (leftBoundary+1)));
 			}
 			else
 			{//RIGHT
-				additionalTimefornode = initX - leftBoundary;
+				additionalTimefornode = initX - (leftBoundary+1);
 			}
 		}
 		if (leftBoundary != -1 && rightBoundary == -1)
 		{
-			travelRange = width - leftBoundary;
+			travelRange = (travelWidth - 1) - (leftBoundary+1);
+			width = travelRange;
+			leftRange = leftBoundary+1;
 			if (dir == LEFT)
 			{
-				additionalTimefornode = travelRange + (travelRange - (initX - leftBoundary));
+				additionalTimefornode = travelRange + (travelRange - (initX - (leftBoundary+1)));
 			}
 			else
 			{//RIGHT
-				additionalTimefornode = initX - leftBoundary;
+				additionalTimefornode = initX - (leftBoundary+1);
 			}
 		}
 		if (leftBoundary == -1 && rightBoundary != -1)
 		{
-			travelRange = width - rightBoundary;
+			travelRange = rightBoundary-1;
+			width = travelRange;
+			leftRange = 0;
 			if (dir == LEFT)
 			{
 				additionalTimefornode = travelRange + (travelRange - initX);
@@ -129,9 +147,10 @@ public:
 	void initVerticalBoundaries(Directions dir, int travelWidth, int topBoundary = -1, int bottomBoundary = -1)
 	{
 		m_type = VERTICAL;
+		
 		if (topBoundary == -1 && bottomBoundary == -1)
 		{//no boundaries 
-			width = travelWidth;
+			width = travelWidth-1;//travel from 0 so width is 0-8
 			topRange = 0;
 			if (dir == DOWN)
 			{
@@ -139,10 +158,52 @@ public:
 			}
 			else
 			{//UP
-				additionalTimefornode = 2 * travelWidth - initY;
+				additionalTimefornode = 2 * width - initY;
 			}
 		}
-		//TODO add for vertical travelRange compute
+		if (topBoundary != -1 && bottomBoundary != -1)
+		{
+			travelRange = (bottomBoundary - 1) - (topBoundary + 1);
+			width = travelRange;//travel to boundary but not on boundary -1?!
+			topRange = topBoundary + 1;
+						
+			if (dir == UP)
+			{
+				additionalTimefornode = travelRange + (travelRange - (initY - (topBoundary+1)));
+			}
+			else
+			{//DOWN
+				additionalTimefornode = initY - (topBoundary+1);
+			}
+		}
+		if (topBoundary != -1 && bottomBoundary == -1)
+		{
+			travelRange = (travelWidth-1) - (topBoundary+1);
+			width = travelRange;
+			topRange = topBoundary + 1;
+			if (dir == UP)
+			{
+				additionalTimefornode = travelRange + (travelRange - (initY - (topBoundary+1)));
+			}
+			else
+			{//DOWN
+				additionalTimefornode = initY - (topBoundary+1);
+			}
+		}
+		if (topBoundary == -1 && bottomBoundary != -1)
+		{
+			travelRange = bottomBoundary-1;
+			width = travelRange;
+			topRange = 0;
+			if (dir == UP)
+			{
+				additionalTimefornode = travelRange + (travelRange - initY);
+			}
+			else
+			{//RIGHT
+				additionalTimefornode = initY;
+			}
+		}
 
 
 	}
@@ -161,6 +222,11 @@ public:
 			pos = topRange + pingpong((frame - 1) + additionalTimefornode, width);
 			curY = pos;
 			curX = initX;
+		}
+		if (m_type == STATIC)
+		{
+			curX = initX;
+			curY = initY;
 		}
 
 	}
@@ -253,7 +319,7 @@ public:
 	intgrid_t patterngrid;
 	intgrid_t passivenodesgrid;
 	vector<bool> hasObstaclesInRow;//y - height -> row change
-	vector<bool> hasObstaclesInColumns;//x - width -> column change
+	vector<bool> hasObstaclesInColumn;//x - width -> column change
 	nodegrid_t initNodeGrid;
 	int width, height;
 	const std::vector<int> pattern111 = { 1,1,1 };
@@ -263,6 +329,7 @@ public:
 	std::vector<string> firstFrameList;
 
 	std::deque<Node*> nodesDeque;
+	std::deque<Node*> undecidednodesDeque;
 
 	
 
@@ -272,11 +339,8 @@ public:
 		width = _width;
 		height = _height;
 
-		//grid[0].resize(height);
-		//grid[1].resize(height);
-		//grid[2].resize(height);
 		hasObstaclesInRow.resize(height);
-		hasObstaclesInColumns.resize(width);
+		hasObstaclesInColumn.resize(width);
 		patterngrid.resize(height);
 		passivenodesgrid.resize(height);
 		initNodeGrid.resize(height);
@@ -297,7 +361,7 @@ public:
 			for (int x = 0; x < width; x++)
 			{
 				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
-				//grid[0][i][j].SetType(celltype);
+
 				if (celltype == CellType::ET_NODE)
 				{
 					patterngrid[y][x]++;
@@ -307,7 +371,7 @@ public:
 				{
 					passivenodesgrid[y][x]++;
 					hasObstaclesInRow[y] = true;
-					hasObstaclesInColumns[x] = true;
+					hasObstaclesInColumn[x] = true;
 				}
 
 			}
@@ -318,6 +382,8 @@ public:
 	//add second frame
 	void addSecondFrame(vector<string>& initList)
 	{
+		
+
 		for (int y = 0; y < height; y++)//
 		{
 			string mapRow; // one line of the firewall grid
@@ -334,9 +400,28 @@ public:
 			}
 
 		}
+		std::fstream	of0("Map0.txt", std::ios::out | std::ios::trunc);
+
+		if (of0.is_open())
+		{
+			for (int y = 0; y < height; ++y)
+			{
+				for (int x = 0; x < width; ++x)
+				{
+					of0 << patterngrid[y][x] << " ";
+				}
+				of0 << "\n";
+			}
+			of0.close();
+		}
 	}
+
 	void addThirdFrame(vector<string>& initList)
 	{
+		//print map for first two steps
+
+
+
 		for (int y = 0; y < height; y++)//
 		{
 			string mapRow; // one line of the firewall grid
@@ -353,21 +438,135 @@ public:
 			}
 
 		};
-		std::fstream of("Map.txt", std::ios::out | std::ios::trunc);
+	}
 
-		if (of.is_open())
+	void caseUpDown(int x,int y,int direction, Node* pNode)
+	{
+		//check if there are passive nodes in column
+		if (hasObstaclesInColumn[x])
 		{
-			for (int y = 0; y < height; ++y)
+			int topObstacle = -1;
+			int bottomObstacle = -1;
+			bool stop = true;
+			//check left
+			int i = y - 1;
+			while (i > -1)
 			{
-				for (int x = 0; x < width; ++x)
+				int topIndex = passivenodesgrid[i--][x];
+				if (topIndex)
 				{
-					of << patterngrid[y][x] << " ";
+					topObstacle = i + 1;
+					break;
 				}
-				of << "\n";
-			}
-			of.close();
+			};
+			i = y + 1;
+			while (i < height)
+			{
+				int bottomIndex = passivenodesgrid[i++][x];
+				if (bottomIndex)
+				{
+					bottomObstacle = i - 1;
+					break;
+				}
+			};
+			//if(leftObstacle==-1)//no left obstacle
+			pNode->initVerticalBoundaries(static_cast<Directions>(direction), height, topObstacle, bottomObstacle);
+
 		}
+		else
+		{
+			pNode->initVerticalBoundaries(static_cast<Directions>(direction), height);
+		}
+	}
+
+	void caseLeftRight(int x, int y, int direction, Node* pNode)
+	{
+		if (hasObstaclesInRow[y])
+		{
+			int leftObstacle = -1;
+			int rigthObstacle = -1;
+			bool stop = true;
+			//check left
+			int i = x - 1;
+			while (i > -1)
+			{
+				int leftIndex = passivenodesgrid[y][i--];
+				if (leftIndex)
+				{
+					leftObstacle = i + 1;
+					break;
+				}
+			};
+			i = pNode->initX + 1;
+			while (i < width)
+			{
+				int rightIndex = passivenodesgrid[y][i++];
+				if (rightIndex)
+				{
+					rigthObstacle = i - 1;
+					break;
+				}
+			};
+		
+			pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width, leftObstacle, rigthObstacle);
+
+		}
+		else
+		{
+			pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width);
+		}
+
+	}
+	void analyseUndecided()
+	{
+		int direction;
+		std::vector<std::vector<int>> vectorpatterns{ {}/*UP*/,{} /*RIGHT*/,{} /*DOWN*/,{}/*LEFT*/ };
+		std::deque<Node*>::iterator iter = undecidednodesDeque.begin();
+		while (iter != undecidednodesDeque.end())
+		{
+		
+			Node* pNode = *iter;
+			formPattern(pNode->initX, pNode->initY, width, height, vectorpatterns);
+			direction = figurePattern(vectorpatterns);//pass direction to corresponding node
+
+			switch (direction)
+			{
+			case UP:
+			case DOWN:
+				caseUpDown(pNode->initX, pNode->initY, direction, pNode);
+				
+				break;
+			case LEFT:
+			case RIGHT:
+				caseLeftRight(pNode->initX, pNode->initY, direction, pNode);
+
+				break;
+			case UNDECIDED:
+				++iter;
+				continue;
+
+			}
+
+			if (!(pNode->m_type == Node::NOTDETECTED))
+			{
+				nodesDeque.push_back(pNode);
+				iter = undecidednodesDeque.erase(iter);
+				for (int i = 1; i <= 3; i++)
+				{
+					pNode->computePosForFrame(i);
+					patterngrid[pNode->curY][pNode->curX] = 0;
+				}
+			}
+		
+		}
+		
+	}
+
+	int analyseThirdFrame(vector<string>& initList)
+	{
+
 		//now have all frames, compute patterns relative to first frame
+		//TODO as I detected misdetection - 1 st hardcode resolution, 2 nd - will streamline function so that the cirlce is run ok.
 		std::vector<std::vector<int>> vectorpatterns{ {}/*UP*/,{} /*RIGHT*/,{} /*DOWN*/,{}/*LEFT*/ };
 		int direction;
 		for (int y = 0; y < height; y++)//
@@ -380,104 +579,85 @@ public:
 				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
 				if (celltype == CellType::ET_NODE) {
 
-					formPattern(x, y, width, height,  vectorpatterns);
-					
-					//figure pattern, pass to node
-					direction = figurePattern(vectorpatterns);//pass direction to corresponding node 
-					if (direction == -1)
+					//1 test static
+					if (patterngrid[y][x] == 3)
 					{
-						cerr << "no direction found for" << y << " " << x << endl;
+						initNodeGrid[y][x]->initStatic();
 					}
-					//now check boundaries
-					switch (direction)
+					else
 					{
-					case UP: 
-					case DOWN:
-						//check if there are passive nodes in column
-						if (hasObstaclesInColumns[x])
-						{
-							int topObstacle = -1;
-							int bottomObstacle = -1;
-							bool stop = true;
-							//check left
-							int i = y - 1;
-							while (i > -1)
-							{
-								int topIndex = passivenodesgrid[y][i--];
-								if (topIndex)
-								{
-									topObstacle = i + 1;
-									break;
-								}
-							};
-							i = y + 1;
-							while (i < height)
-							{
-								int bottomIndex = passivenodesgrid[y][i++];
-								if (bottomIndex)
-								{
-									bottomObstacle = i - 1;
-									break;
-								}
-							};
-							//if(leftObstacle==-1)//no left obstacle
-							initNodeGrid[y][x]->initVerticalBoundaries(static_cast<Directions>(direction), height, topObstacle, bottomObstacle);
 
-						}
-						else
-						{
-							initNodeGrid[y][x]->initVerticalBoundaries(static_cast<Directions>(direction), height);
-						}
-						break;
-					case LEFT:
-					case RIGHT:
-						if (hasObstaclesInRow[y])
-						{
-							int leftObstacle = -1;
-							int rigthObstacle = -1;
-							bool stop = true;
-							//check left
-							int i = x-1;
-							while (i > -1)
-							{
-								int leftIndex = passivenodesgrid[y][i--];
-								if (leftIndex)
-								{
-									leftObstacle = i + 1;
-									break;
-								}
-							};
-							i = x + 1;
-							while (i < width) 
-							{
-								int rightIndex = passivenodesgrid[y][i++];
-								if (rightIndex)
-								{
-									rigthObstacle = i - 1;
-									break;
-								}
-							};
-							//if(leftObstacle==-1)//no left obstacle
-							initNodeGrid[y][x]->initHorizontalBoundaries(static_cast<Directions>(direction),width, leftObstacle, rigthObstacle);
-
-						}
-						else
-						{
-							initNodeGrid[y][x]->initHorizontalBoundaries(static_cast<Directions>(direction), width);
-						}
-
-						break;
+						formPattern(x, y, width, height, vectorpatterns);
 						
-					}
+						//figure pattern, pass to node
+						direction = figurePattern(vectorpatterns);//pass direction to corresponding node 
+						if (direction == -1)
+						{
+							cerr << "no direction found for" << y << " " << x << endl;
+						}
+						//now check boundaries
+						switch (direction)
+						{
+						case UP:
+						case DOWN:
+							caseUpDown(x, y, direction, initNodeGrid[y][x]);
+							
+							
+							break;
+						case LEFT:
+						case RIGHT:
+							caseLeftRight(x, y, direction, initNodeGrid[y][x]);
+							
+							break;
+						case UNDECIDED:
+							initNodeGrid[y][x]->initUndecided();
 
+						}
+
+					}
 				}
 				if (initNodeGrid[y][x] != NULL)
 				{
-					nodesDeque.push_back(initNodeGrid[y][x]);
+					if (!(initNodeGrid[y][x]->m_type == Node::NOTDETECTED))
+					{
+						nodesDeque.push_back(initNodeGrid[y][x]);
+					}
+					else
+					{
+						undecidednodesDeque.push_back(initNodeGrid[y][x]);
+					}
 				}
 			}
 
 		}
+		for (Node* pNode : nodesDeque)
+		{
+			for (int i = 1; i <=3; i++)
+			{
+				pNode->computePosForFrame(i);
+				patterngrid[pNode->curY][pNode->curX] = 0;
+			}
+		}
+ 
+		std::fstream	ofc("MapCleaned.txt", std::ios::out | std::ios::trunc);
+
+		if (ofc.is_open())
+		{
+			for (int y = 0; y < height; ++y)
+			{
+				for (int x = 0; x < width; ++x)
+				{
+					ofc << patterngrid[y][x] << " ";
+				}
+				ofc << "\n";
+			}
+			ofc.close();
+		}
+		//let's deal with undecided - so far just an attempt
+
+		return undecidednodesDeque.size();
+
+
 
 
 
@@ -516,6 +696,19 @@ public:
 			if (vectorpatterns[i] == pattern111 || vectorpatterns[i] == pattern21 || vectorpatterns[i] == pattern210)
 			{
 				found = i;
+				//check if there is another one 111 pattern
+				for (int j = 0; j < 4; j++)
+				{
+					if (j == found)
+						continue;
+					if (vectorpatterns[j] == pattern111 || vectorpatterns[j] == pattern21 || vectorpatterns[j] == pattern210)
+					{
+						//yes there is at least one more pattern
+						found = UNDECIDED;
+						break;
+					}
+
+				}
 				break;
 				//to node - i is a direction of initial node movement
 			}
@@ -579,20 +772,23 @@ int main()
 	//cin >> width >> height; cin.ignore();
 	
 	//test with test 7 of Vox Codei
-	width = 12;
-	height = 9;
+	width = 16;
+	height = 12;
 	
 	vector<string> initList =
 	{
-		"........@...",
-		".......@....",
-		".#....@...#.",
-		".....@......",
-		"....@.......",
-		"...@........",
-		"..@.........",
-		"#@.......#..",
-		"@...........",
+		"##..@...##@@@.@@",
+		"##.....#.##..@..",
+		"..#...#..#######",
+		"...#@#...##@...#",
+		"@..@.@..@#....#.",
+		"...#@#####...#..",
+		"..#...#...#@#...",
+		".#....#@..@.@..@",
+		"#...@.##..#@#...",
+		"#######@##...#..",
+		"......@.@#....##",
+		"@.........#@..#.",
 	};
 	
 	
@@ -633,15 +829,18 @@ int main()
 			break;
 		case 2:
 			initList = {
-				".......@....",
-				"........@...",
-				".#........#.",
-				"....@.@.....",
-				"............",
-				"..@.........",
-				"...@........",
-				"#.@......#..",
-				".@..........",
+				"##.@....##@@@.@@",
+				"##.....#.##.@...",
+				"..#...#..#######",
+				"...#@#..@##.@..#",
+				"...@.@...#....#.",
+				"@..#@#####...#..",
+				"..#...#@..#@#...",
+				".#....#...@.@...",
+				"#..@..##..#@#..@",
+				"#######@##...#..",
+				"......@.@#....##",
+				".@........#.@.#.",
 			};
 			//add second frame
 			pDetection->addSecondFrame(initList);
@@ -649,28 +848,40 @@ int main()
 		case 3:
 			//add third frame, init all
 			initList = {
-				"......@.....",
-				".........@..",
-				".#..@.....#.",
-				".......@....",
-				"......@.....",
-				".@..........",
-				"....@.......",
-				"#..@.....#..",
-				"..@.........",
+				"##@.....##@@@.@@",
+				"##.....#.##@....",
+				"..#...#.@#######",
+				"...#@#...##..@.#",
+				"...@.@...#....#.",
+				"...#@#####...#..",
+				"@.#...#...#@#...",
+				".#....#@..@.@...",
+				"#.@...##..#@#...",
+				"#######@##...#.@",
+				"......@.@#....##",
+				"..@.......#..@#.",
 			};
 			pDetection->addThirdFrame(initList);
+			pDetection->analyseThirdFrame(initList);
+			while (pDetection->undecidednodesDeque.size())
+			{
+				//resolve undecided
+				pDetection->analyseUndecided();
+			}
 			break;
 		default:
 			//simulate
 			//test so far
-			for (int frame = 1; frame <= 22; frame++)
+			Node* pNode = pDetection->nodesDeque[9];
+			for (int frame = 1; frame <= 100; frame++)
 			{
-				for (Node* pNode : pDetection->nodesDeque)
+				//for (Node* pNode : pDetection->nodesDeque)
+				
 				{
 					pNode->computePosForFrame(frame);
 					bool stop = true;
 				}
+				std::cout << "frame " << frame << " posX " << pNode->curX << " posY " << pNode->curY << std::endl;
 				bool stop = true;
 			}
 			break;
