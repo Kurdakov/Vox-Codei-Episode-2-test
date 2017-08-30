@@ -38,12 +38,62 @@ enum Directions
 	UNDECIDED,
 };
 
+class vec2d {
+public:
+	float x;
+	float y;
+	vec2d() :x(0), y(0)
+	{};
+	vec2d(int initX, int initY) : x(initX), y(initY)
+	{};
+
+	float& operator[] (size_t i)
+	{
+		switch (i) {
+		case 0: return x;
+		case 1: return y;
+		//will not use other access! default: throw "something";
+		}
+	}
+
+	float operator[] (size_t i) const
+	{
+		return (*const_cast<vec2d*>(this))[i];
+	}
+};
+
+class Bomb {
+public:
+	Bomb(int _x, int _y, int frame) :x(_x), y(_y), tick(0), framePlaced(frame)
+	{
+		frameExplodes = framePlaced + 4;
+	}
+	int x, y;
+	int framePlaced;
+	int frameExplodes;//framePlaced+4 waits 3 steps then explodes
+	int tick;
+	void render();//pass into params.
+};
+
 class Node {
 public:
-	Node(int _initX,int _initY):initX(_initX),initY(_initY)
-	{};
+	Node(int _initX,int _initY):initPos(_initX,_initY), curPos(_initX, _initY)
+	{
+		b_eliminated = false;
+	};
 	Node()
 	{};
+
+	Node(const Node& othernode)
+	{
+		m_type  = othernode.m_type;
+		width   = othernode.width;
+		initPos = othernode.initPos;
+		curPos  = othernode.curPos;
+		initRange = othernode.initRange;
+		travelRange = othernode.travelRange;
+		additionalTimefornode = othernode.additionalTimefornode;
+	}
 
 	enum NodeType
 	{
@@ -53,23 +103,19 @@ public:
 		NOTDETECTED,
 	};
 
-	int initX, initY;
-	
+	vec2d initPos;
+	vec2d curPos;
 	int additionalTimefornode;//fake 'time' to fit into pingpong function
 	NodeType m_type;
 	int width;
-	int leftRange, topRange;
+	int initRange;
 	int travelRange;
 	int pos;
-	int curX, curY;
+	bool b_eliminated;
+	
 
 	void computePosOnFrame(int frameNum) {};
 	void renderToMap() {};
-	void setXY(int _initX, int _initY)
-	{
-		initX = _initX;
-		initY = _initY;
-	}
 
 	void initUndecided()
 	{
@@ -81,154 +127,80 @@ public:
 		m_type = STATIC;
 	}
 
-	void initHorizontalBoundaries(Directions dir,int travelWidth,int leftBoundary=-1, int rightBoundary=-1)
+	void initBoundaries(NodeType type,int dir, int travelWidth, int boundary1 = -1, int boundary2 = -1)
 	{
-		m_type = HORIZONTAL;
-		if (leftBoundary == -1 && rightBoundary == -1)
+		m_type = type;
+		if (boundary1 == -1 && boundary2 == -1)
 		{//no boundaries
-			
-			width = travelWidth-1;//0 -
-			leftRange = 0;
-			if (dir == RIGHT)
+
+			width = travelWidth - 1;//0 -
+			initRange = 0;
+			if (dir == 1)//right bottom
 			{
-				additionalTimefornode = initX;
+				additionalTimefornode = initPos[m_type];
 			}
 			else
-			{//LEFT
-				additionalTimefornode = 2* width - initX;
+			{//left top
+				additionalTimefornode = 2 * width - initPos[m_type];
 			}
 		}
-		if (leftBoundary != -1 && rightBoundary != -1)
+		if (boundary1 != -1 && boundary2 != -1)
 		{
-			
-			travelRange = (rightBoundary - 1) - (leftBoundary+1);
+
+			travelRange = (boundary2 - 1) - (boundary1 + 1);
 			width = travelRange;//travel to boundary but not on boundary -1?!
-			leftRange = leftBoundary+1;
-			if (dir == LEFT)
+			initRange = boundary1 + 1;
+			if (dir == -1)
 			{
-				additionalTimefornode = travelRange + (travelRange - (initX - (leftBoundary+1)));
+				additionalTimefornode = travelRange + (travelRange - (initPos[m_type] - (boundary1 + 1)));
 			}
 			else
 			{//RIGHT
-				additionalTimefornode = initX - (leftBoundary+1);
+				additionalTimefornode = initPos[m_type] - (boundary1 + 1);
 			}
 		}
-		if (leftBoundary != -1 && rightBoundary == -1)
+		if (boundary1 != -1 && boundary2 == -1)
 		{
-			travelRange = (travelWidth - 1) - (leftBoundary+1);
+			travelRange = (travelWidth - 1) - (boundary1 + 1);
 			width = travelRange;
-			leftRange = leftBoundary+1;
-			if (dir == LEFT)
+			initRange = boundary1 + 1;
+			if (dir == -1)
 			{
-				additionalTimefornode = travelRange + (travelRange - (initX - (leftBoundary+1)));
+				additionalTimefornode = travelRange + (travelRange - (initPos[m_type] - (boundary1 + 1)));
 			}
 			else
 			{//RIGHT
-				additionalTimefornode = initX - (leftBoundary+1);
+				additionalTimefornode = initPos[m_type] - (boundary1 + 1);
 			}
 		}
-		if (leftBoundary == -1 && rightBoundary != -1)
+		if (boundary1 == -1 && boundary2 != -1)
 		{
-			travelRange = rightBoundary-1;
+			travelRange = boundary2 - 1;
 			width = travelRange;
-			leftRange = 0;
-			if (dir == LEFT)
+			initRange = 0;
+			if (dir == -1)
 			{
-				additionalTimefornode = travelRange + (travelRange - initX);
+				additionalTimefornode = travelRange + (travelRange - initPos[m_type]);
 			}
 			else
-			{//RIGHT
-				additionalTimefornode = initX;
+			{//RIGHT bottom
+				additionalTimefornode = initPos[m_type];
 			}
 		}
 
 
 	}
-	void initVerticalBoundaries(Directions dir, int travelWidth, int topBoundary = -1, int bottomBoundary = -1)
-	{
-		m_type = VERTICAL;
-		
-		if (topBoundary == -1 && bottomBoundary == -1)
-		{//no boundaries 
-			width = travelWidth-1;//travel from 0 so width is 0-8
-			topRange = 0;
-			if (dir == DOWN)
-			{
-				additionalTimefornode = initY;
-			}
-			else
-			{//UP
-				additionalTimefornode = 2 * width - initY;
-			}
-		}
-		if (topBoundary != -1 && bottomBoundary != -1)
-		{
-			travelRange = (bottomBoundary - 1) - (topBoundary + 1);
-			width = travelRange;//travel to boundary but not on boundary -1?!
-			topRange = topBoundary + 1;
-						
-			if (dir == UP)
-			{
-				additionalTimefornode = travelRange + (travelRange - (initY - (topBoundary+1)));
-			}
-			else
-			{//DOWN
-				additionalTimefornode = initY - (topBoundary+1);
-			}
-		}
-		if (topBoundary != -1 && bottomBoundary == -1)
-		{
-			travelRange = (travelWidth-1) - (topBoundary+1);
-			width = travelRange;
-			topRange = topBoundary + 1;
-			if (dir == UP)
-			{
-				additionalTimefornode = travelRange + (travelRange - (initY - (topBoundary+1)));
-			}
-			else
-			{//DOWN
-				additionalTimefornode = initY - (topBoundary+1);
-			}
-		}
-		if (topBoundary == -1 && bottomBoundary != -1)
-		{
-			travelRange = bottomBoundary-1;
-			width = travelRange;
-			topRange = 0;
-			if (dir == UP)
-			{
-				additionalTimefornode = travelRange + (travelRange - initY);
-			}
-			else
-			{//RIGHT
-				additionalTimefornode = initY;
-			}
-		}
 
-
-	}
+	
 
 	void computePosForFrame(int frame)
 	{
-		
-		if (m_type == HORIZONTAL)
-		{
-			pos = leftRange + pingpong((frame - 1) + additionalTimefornode, width);
-			curX = pos;
-			curY = initY;
-		}
-		if (m_type == VERTICAL)
-		{
-			pos = topRange + pingpong((frame - 1) + additionalTimefornode, width);
-			curY = pos;
-			curX = initX;
-		}
 		if (m_type == STATIC)
-		{
-			curX = initX;
-			curY = initY;
-		}
+			return;
 
+		pos = initRange + pingpong((frame - 1) + additionalTimefornode, width);
+		curPos[m_type] = pos;
+		//if (m_type == STATIC)//not changed after init.
 	}
 
 
@@ -291,14 +263,7 @@ typedef std::list<node_t> nodes_list_t;
 typedef std::vector<vector<int>> intgrid_t;
 typedef std::vector<vector<Node*>> nodegrid_t;
 
-
-
-class GameField {
-public:
-	int width, height;
-
-};
-
+typedef std::deque <shared_ptr<Node>> nodesdesque_t;
 
 struct Possibility
 {
@@ -309,8 +274,46 @@ struct Possibility
 	int scoreWithRange;
 	int scoreWithSingles;
 	list<Node*> affectedNodesList;//?
-	
+
 };
+
+typedef std::deque <Possibility>  possibilitiesdeque_t;
+typedef std::deque <Bomb>  bombsdeque_t;
+
+class GameField {
+public:
+	int width, height;
+	int numBombs;
+	int rounds;
+	int maxDepth;//adjust this by trial.
+	bool simulate(int frame, nodesdesque_t& nodes, int bombs, bombsdeque_t& activebombs, possibilitiesdeque_t& seq, int depth)
+	{
+		int remains = nodes.size();
+		if (remains == 0) {
+			// no more nodes to blow
+			return true;//seq;
+		}
+		if (bombs == 0 || frame>rounds) {
+			// no more bombs or game finished
+			return false;
+		}
+		if (depth > maxDepth)
+		{
+			return true;//compute now score.
+		}
+		// compute possible bomb locations
+		vector<Possibility> possibles = {};
+		nodesdesque_t nextNodesDeque;
+		std::copy_if(nodes.cbegin(), nodes.cend(),
+			std::back_inserter(nextNodesDeque),
+			[](const shared_ptr<Node>& node) { return !node->b_eliminated; });
+	
+	};
+
+};
+
+
+
 
 class Detection {
 public:
@@ -382,8 +385,6 @@ public:
 	//add second frame
 	void addSecondFrame(vector<string>& initList)
 	{
-		
-
 		for (int y = 0; y < height; y++)//
 		{
 			string mapRow; // one line of the firewall grid
@@ -470,12 +471,12 @@ public:
 				}
 			};
 			//if(leftObstacle==-1)//no left obstacle
-			pNode->initVerticalBoundaries(static_cast<Directions>(direction), height, topObstacle, bottomObstacle);
+			pNode->initBoundaries(Node::VERTICAL,(direction==UP)? -1:1, height, topObstacle, bottomObstacle);
 
 		}
 		else
 		{
-			pNode->initVerticalBoundaries(static_cast<Directions>(direction), height);
+			pNode->initBoundaries(Node::VERTICAL, (direction == UP) ? -1:1, height);
 		}
 	}
 
@@ -497,7 +498,7 @@ public:
 					break;
 				}
 			};
-			i = pNode->initX + 1;
+			i = pNode->initPos.x + 1;
 			while (i < width)
 			{
 				int rightIndex = passivenodesgrid[y][i++];
@@ -507,13 +508,14 @@ public:
 					break;
 				}
 			};
-		
-			pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width, leftObstacle, rigthObstacle);
+			pNode->initBoundaries(Node::HORIZONTAL, (direction == LEFT) ? -1 : 1, height, leftObstacle, rigthObstacle);
+			//pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width, leftObstacle, rigthObstacle);
 
 		}
 		else
 		{
-			pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width);
+			pNode->initBoundaries(Node::HORIZONTAL, (direction == LEFT) ? -1 : 1, height);
+			//pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width);
 		}
 
 	}
@@ -526,19 +528,19 @@ public:
 		{
 		
 			Node* pNode = *iter;
-			formPattern(pNode->initX, pNode->initY, width, height, vectorpatterns);
+			formPattern(pNode->initPos.x, pNode->initPos.y, width, height, vectorpatterns);
 			direction = figurePattern(vectorpatterns);//pass direction to corresponding node
 
 			switch (direction)
 			{
 			case UP:
 			case DOWN:
-				caseUpDown(pNode->initX, pNode->initY, direction, pNode);
+				caseUpDown(pNode->initPos.x, pNode->initPos.y, direction, pNode);
 				
 				break;
 			case LEFT:
 			case RIGHT:
-				caseLeftRight(pNode->initX, pNode->initY, direction, pNode);
+				caseLeftRight(pNode->initPos.x, pNode->initPos.y, direction, pNode);
 
 				break;
 			case UNDECIDED:
@@ -554,7 +556,7 @@ public:
 				for (int i = 1; i <= 3; i++)
 				{
 					pNode->computePosForFrame(i);
-					patterngrid[pNode->curY][pNode->curX] = 0;
+					patterngrid[pNode->curPos.y][pNode->initPos.x] = 0;
 				}
 			}
 		
@@ -635,7 +637,7 @@ public:
 			for (int i = 1; i <=3; i++)
 			{
 				pNode->computePosForFrame(i);
-				patterngrid[pNode->curY][pNode->curX] = 0;
+				patterngrid[pNode->curPos.y][pNode->curPos.x] = 0;
 			}
 		}
  
@@ -772,23 +774,20 @@ int main()
 	//cin >> width >> height; cin.ignore();
 	
 	//test with test 7 of Vox Codei
-	width = 16;
-	height = 12;
+	width = 12;
+	height = 9;
 	
 	vector<string> initList =
 	{
-		"##..@...##@@@.@@",
-		"##.....#.##..@..",
-		"..#...#..#######",
-		"...#@#...##@...#",
-		"@..@.@..@#....#.",
-		"...#@#####...#..",
-		"..#...#...#@#...",
-		".#....#@..@.@..@",
-		"#...@.##..#@#...",
-		"#######@##...#..",
-		"......@.@#....##",
-		"@.........#@..#.",
+		"..@....@....",
+		"...........@",
+		".@..........",
+		".....@......",
+		"@...........",
+		"............",
+		"............",
+		".@..........",
+		"............",
 	};
 	
 	
@@ -829,18 +828,15 @@ int main()
 			break;
 		case 2:
 			initList = {
-				"##.@....##@@@.@@",
-				"##.....#.##.@...",
-				"..#...#..#######",
-				"...#@#..@##.@..#",
-				"...@.@...#....#.",
-				"@..#@#####...#..",
-				"..#...#@..#@#...",
-				".#....#...@.@...",
-				"#..@..##..#@#..@",
-				"#######@##...#..",
-				"......@.@#....##",
-				".@........#.@.#.",
+				"..@........@",
+				".......@....",
+				"@...........",
+				"............",
+				".@...@......",
+				"............",
+				"............",
+				"..@.........",
+				"............",
 			};
 			//add second frame
 			pDetection->addSecondFrame(initList);
@@ -848,18 +844,15 @@ int main()
 		case 3:
 			//add third frame, init all
 			initList = {
-				"##@.....##@@@.@@",
-				"##.....#.##@....",
-				"..#...#.@#######",
-				"...#@#...##..@.#",
-				"...@.@...#....#.",
-				"...#@#####...#..",
-				"@.#...#...#@#...",
-				".#....#@..@.@...",
-				"#.@...##..#@#...",
-				"#######@##...#.@",
-				"......@.@#....##",
-				"..@.......#..@#.",
+				"..@.........",
+				"...........@",
+				".@.....@....",
+				"............",
+				"..@.........",
+				".....@......",
+				"............",
+				"...@........",
+				"............",
 			};
 			pDetection->addThirdFrame(initList);
 			pDetection->analyseThirdFrame(initList);
@@ -872,7 +865,7 @@ int main()
 		default:
 			//simulate
 			//test so far
-			Node* pNode = pDetection->nodesDeque[9];
+			Node* pNode = pDetection->nodesDeque[0];
 			for (int frame = 1; frame <= 100; frame++)
 			{
 				//for (Node* pNode : pDetection->nodesDeque)
@@ -881,7 +874,7 @@ int main()
 					pNode->computePosForFrame(frame);
 					bool stop = true;
 				}
-				std::cout << "frame " << frame << " posX " << pNode->curX << " posY " << pNode->curY << std::endl;
+				std::cout << "frame " << frame <<" posX " << pNode->curPos.x  << " posY " << pNode->curPos.y << std::endl;
 				bool stop = true;
 			}
 			break;
