@@ -64,25 +64,89 @@ public:
 
 class Bomb {
 public:
-	Bomb(int _x, int _y, int frame) :x(_x), y(_y), tick(0), framePlaced(frame)
+	Bomb(int _x, int _y, int frame) :x(_x), y(_y), tickCounter(0), framePlaced(frame)
 	{
-		frameExplodes = framePlaced + 4;
+		frameExplodes = framePlaced + 3;
 	}
 	int x, y;
 	int framePlaced;
 	int frameExplodes;//framePlaced+4 waits 3 steps then explodes
-	int tick;
-	void render();//pass into params.
+	int tickCounter;
+	void render() {};//pass into params.
+
+	bool tick()
+	{
+		tickCounter++;
+		if ((tickCounter+framePlaced) >= frameExplodes)
+		{
+			return true;
+		}
+		return
+			false;
+	}
+
+	shared_ptr<Bomb> clone()
+	{
+		shared_ptr<Bomb> pBomb = make_shared<Bomb>(x,y,framePlaced);
+
+		//pBomb->x = x;
+		//pBomb->y = y;
+		//pBomb->framePlaced = framePlaced;
+		//pBomb->frameExplodes = frameExplodes;
+
+		return pBomb;
+	}
 };
 
 class Node {
 public:
+	enum NodeType
+	{
+		HORIZONTAL = 0,
+		VERTICAL,
+		STATIC,
+		NOTDETECTED,
+	};
+
+	Node(Node::NodeType _type):m_type(_type)
+	{};
+
 	Node(int _initX,int _initY):initPos(_initX,_initY), curPos(_initX, _initY)
 	{
 		b_eliminated = false;
+		width = 0;
+		initRange = 0;
+		travelRange = 0;
+		additionalTimefornode = 0;
+		
 	};
+	
+
 	Node()
-	{};
+	{
+		b_eliminated = false;
+		width = 0;
+		initRange = 0;
+		travelRange = 0;
+		additionalTimefornode = 0;
+	};
+
+	
+
+	shared_ptr<Node> clone()
+	{
+		shared_ptr<Node> pNode = make_shared<Node>(m_type);
+			
+		pNode->width =  width;
+		pNode->initPos = initPos;
+		pNode->curPos = curPos;
+		pNode->initRange = initRange;
+		pNode->travelRange = travelRange;
+		pNode->additionalTimefornode = additionalTimefornode;
+		pNode->b_eliminated = b_eliminated;
+
+		return pNode;
+	}
 
 	Node(const Node& othernode)
 	{
@@ -95,14 +159,7 @@ public:
 		additionalTimefornode = othernode.additionalTimefornode;
 	}
 
-	enum NodeType
-	{
-		HORIZONTAL = 0,
-		VERTICAL,
-		STATIC,
-		NOTDETECTED,
-	};
-
+	
 	vec2d initPos;
 	vec2d curPos;
 	int additionalTimefornode;//fake 'time' to fit into pingpong function
@@ -110,7 +167,6 @@ public:
 	int width;
 	int initRange;
 	int travelRange;
-	int pos;
 	bool b_eliminated;
 	
 
@@ -198,9 +254,13 @@ public:
 		if (m_type == STATIC)
 			return;
 
-		pos = initRange + pingpong((frame - 1) + additionalTimefornode, width);
-		curPos[m_type] = pos;
-		//if (m_type == STATIC)//not changed after init.
+		curPos[m_type] = initRange + pingpong((frame - 1) + additionalTimefornode, width);
+	
+	}
+
+	Node::NodeType GetType()
+	{
+		return m_type;
 	}
 
 
@@ -212,15 +272,19 @@ typedef std::deque<Node> nodelist_t;
 class CellType {
 
 public:
+	CellType()
+	{
+		m_eType = ET_EMPTY;
+		pNode = 0;
+	}
 	enum EType
 	{
 		ET_EMPTY = '.',
 		ET_NODE = '@',
 		ET_PASSIVE = '#',
-		BOMB_3 = 3,
-		BOMB_2 = 2,
-		BOMB_1 = 1,
-		BOMB_0 = 0,
+		ET_EXPLOSION = '*',
+
+
 	};
 	EType operator-(const EType& r) {
 		return EType(static_cast<int>(r) - static_cast<int>(m_eType));   
@@ -270,44 +334,370 @@ struct Possibility
 	int x, y; //coordinates of the point
 	int roundActed;
 	int roundPlaced;//
-	int scoreAsCount;
+	int score;
 	int scoreWithRange;
 	int scoreWithSingles;
-	list<Node*> affectedNodesList;//?
+	int numMoving;
+	int sumRangeOfMoving;
+	//list<Node*> affectedNodesList;//?
 
 };
 
 typedef std::deque <Possibility>  possibilitiesdeque_t;
 typedef std::deque <Bomb>  bombsdeque_t;
 
+template<class InputIt, class OutputIt, class UnaryPredicate>
+OutputIt copy_if_gm(InputIt first, InputIt last,
+	OutputIt d_first, UnaryPredicate pred)
+{
+	while (first != last) {
+		if (pred(*first))
+			*d_first++ = (*first)->clone();
+		first++;
+	}
+	return d_first;
+}
+
 class GameField {
 public:
+	GameField(int _width, int _height) :width(_width), height(_height)
+	{
+		passiveNodesGrid.resize(height);
+		currentMap.resize(height);
+		placementMap.resize(height);
+		step2predMap.resize(height);
+		predictedMap.resize(height);
+	};
 	int width, height;
 	int numBombs;
 	int rounds;
 	int maxDepth;//adjust this by trial.
-	bool simulate(int frame, nodesdesque_t& nodes, int bombs, bombsdeque_t& activebombs, possibilitiesdeque_t& seq, int depth)
+	grid_t passiveNodesGrid;
+	grid_t currentMap;
+	grid_t placementMap;
+	grid_t step2predMap;
+	grid_t predictedMap;
+	bombsdeque_t bombsdeque;
+	possibilitiesdeque_t possibilitiesdeque;
+	nodesdesque_t nodesdeque;
+	void init(intgrid_t& passivenodesgrid)
 	{
-		int remains = nodes.size();
-		if (remains == 0) {
-			// no more nodes to blow
-			return true;//seq;
+		for (int y = 0; y < height; y++) {
+			passiveNodesGrid[y].resize(width);
+			currentMap[y].resize(width);
+			placementMap[y].resize(width);
+			step2predMap[y].resize(width);
+			predictedMap[y].resize(width);
+
+			for (int x = 0; x < width; x++)
+			{
+				int hasPassive = passivenodesgrid[y][x];
+
+				if (hasPassive)
+				{
+					passiveNodesGrid[y][x].SetType(CellType::ET_PASSIVE);
+				}
+
+			}
+
 		}
-		if (bombs == 0 || frame>rounds) {
-			// no more bombs or game finished
-			return false;
-		}
-		if (depth > maxDepth)
+
+	};
+		
+	void applyExplosion(grid_t& grid, int x, int y)
+	{
+		grid[y][x].SetType(CellType::ET_EMPTY);
+		if (grid[y][x].pNode)
 		{
-			return true;//compute now score.
+			grid[y][x].pNode->b_eliminated = true;
 		}
+		for (int i = x - 1; i >= max(0, x - 3); --i)
+		{
+			if (grid[y][i] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[y][i] == CellType::ET_NODE)
+			{
+				grid[y][i].SetType(CellType::ET_EMPTY);
+				grid[y][i].pNode->b_eliminated = true;
+			}
+
+		}
+		for (int i = x + 1; i <= min<int>(grid[0].size() - 1, x + 3); ++i)
+		{
+			if (grid[y][i] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[y][i] == CellType::ET_NODE)
+			{
+				grid[y][i].SetType(CellType::ET_EMPTY);
+				grid[y][i].pNode->b_eliminated = true;
+			}
+		}
+		for (int i = y - 1; i >= max(0, y - 3); --i)
+		{
+			if (grid[i][x] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[i][x] == CellType::ET_NODE)
+			{
+				grid[i][x].SetType(CellType::ET_EMPTY);
+				grid[i][x].pNode->b_eliminated = true;
+			}
+		}
+		for (int i = y + 1; i <= min<int>(grid.size() - 1, y + 3); ++i)
+		{
+			if (grid[i][x] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[i][x] == CellType::ET_NODE)
+			{
+				grid[i][x].SetType(CellType::ET_EMPTY);
+				grid[i][x].pNode->b_eliminated = true;
+			}
+		}
+	}
+
+	int calcScore(grid_t&  grid, Possibility& possibility, int x, int y)
+	{
+		int damage = 0;
+		if (grid[y][x] == CellType::ET_NODE)
+		{
+			damage++;
+			if (grid[y][x].pNode->GetType() == Node::HORIZONTAL || grid[y][x].pNode->GetType() == Node::VERTICAL)
+			{
+				possibility.numMoving++;
+				possibility.sumRangeOfMoving+= grid[y][x].pNode->width;
+			}
+			
+		}
+		for (int i = x - 1; i >= max(0, x - 3); --i)
+		{
+			if (grid[y][i] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[y][i] == CellType::ET_NODE)
+			{
+				damage++;
+				if (grid[y][i].pNode->GetType() == Node::HORIZONTAL || grid[y][i].pNode->GetType() == Node::VERTICAL)
+				{
+					possibility.numMoving++;
+					possibility.sumRangeOfMoving += grid[y][i].pNode->width;
+				}
+			}
+		}
+		for (int i = x + 1; i <= min<int>(grid[0].size() - 1, x + 3); ++i)
+		{
+			if (grid[y][i] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[y][i] == CellType::ET_NODE)
+			{
+				damage++;
+				if (grid[y][i].pNode->GetType() == Node::HORIZONTAL || grid[y][i].pNode->GetType() == Node::VERTICAL)
+				{
+					possibility.numMoving++;
+					possibility.sumRangeOfMoving += grid[y][i].pNode->width;
+				}
+			}
+		}
+		for (int i = y - 1; i >= max(0, y - 3); --i)
+		{
+			if (grid[i][x] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[i][x] == CellType::ET_NODE)
+			{
+				damage++;
+				if (grid[i][x].pNode->GetType() == Node::HORIZONTAL || grid[i][x].pNode->GetType() == Node::VERTICAL)
+				{
+					possibility.numMoving++;
+					possibility.sumRangeOfMoving += grid[i][x].pNode->width;
+				}
+			}
+		}
+		for (int i = y + 1; i <= min<int>(grid.size() - 1, y + 3); ++i)
+		{
+			if (grid[i][x] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[i][x] == CellType::ET_NODE)
+			{
+				damage++;
+				if (grid[i][x].pNode->GetType() == Node::HORIZONTAL || grid[i][x].pNode->GetType() == Node::VERTICAL)
+				{
+					possibility.numMoving++;
+					possibility.sumRangeOfMoving += grid[i][x].pNode->width;
+				}
+			}
+		}
+		possibility.score = damage;
+		return damage;
+	}
+
+	void applyExplosionWithTrack(grid_t& grid,grid_t& trackgrid, int x, int y)
+	{
+		grid[y][x].SetType(CellType::ET_EMPTY);
+		trackgrid[y][x].SetType(CellType::ET_EXPLOSION);
+		if (grid[y][x].pNode)
+		{
+			grid[y][x].pNode->b_eliminated = true;
+		}
+
+		for (int i = x - 1; i >= max(0, x - 3); --i)
+		{
+			if (grid[y][i] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[y][i] == CellType::ET_NODE)
+			{
+				//grid[y][i].SetType(CellType::ET_EMPTY);
+				trackgrid[y][i].SetType(CellType::ET_EXPLOSION);
+				grid[y][i].pNode->b_eliminated = true;
+			} 
+			else if (grid[y][i] == CellType::ET_EMPTY)
+			{
+				trackgrid[y][i].SetType(CellType::ET_EXPLOSION);
+			}
+
+		}
+		for (int i = x + 1; i <= min<int>(grid[0].size() - 1, x + 3); ++i)
+		{
+			if (grid[y][i] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[y][i] == CellType::ET_NODE)
+			{
+				//grid[y][i].SetType(CellType::ET_EMPTY);
+				trackgrid[y][i].SetType(CellType::ET_EXPLOSION);
+				grid[y][i].pNode->b_eliminated = true;
+			}
+			else if (grid[y][i] == CellType::ET_EMPTY)
+			{
+				trackgrid[y][i].SetType(CellType::ET_EXPLOSION);
+			}
+		}
+		for (int i = y - 1; i >= max(0, y - 3); --i)
+		{
+			if (grid[i][x] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[i][x] == CellType::ET_NODE)
+			{
+				//grid[i][x].SetType(CellType::ET_EMPTY);
+				trackgrid[i][x].SetType(CellType::ET_EXPLOSION);
+				grid[i][x].pNode->b_eliminated = true;
+			}
+			else if (grid[i][x] == CellType::ET_EMPTY)
+			{
+				trackgrid[y][i].SetType(CellType::ET_EXPLOSION);
+			}
+		}
+		for (int i = y + 1; i <= min<int>(grid.size() - 1, y + 3); ++i)
+		{
+			if (grid[i][x] == CellType::ET_PASSIVE)
+				break;
+			else if (grid[i][x] == CellType::ET_NODE)
+			{
+				//grid[i][x].SetType(CellType::ET_EMPTY);
+				trackgrid[i][x].SetType(CellType::ET_EXPLOSION);
+				grid[i][x].pNode->b_eliminated = true;
+			}
+			else if (grid[i][x] == CellType::ET_EMPTY)
+			{
+				trackgrid[i][x].SetType(CellType::ET_EXPLOSION);
+			}
+		}
+	}
+	
+	bool simulate(int frame, int& bombs)
+	{
+		//1 - render map where we place a bomb
+
 		// compute possible bomb locations
 		vector<Possibility> possibles = {};
-		nodesdesque_t nextNodesDeque;
-		std::copy_if(nodes.cbegin(), nodes.cend(),
-			std::back_inserter(nextNodesDeque),
-			[](const shared_ptr<Node>& node) { return !node->b_eliminated; });
+		//simulate current map, remove nodes which are affected by current bomb
+		//
+		//clear
+		std::copy(passiveNodesGrid.begin(), passiveNodesGrid.end(), currentMap.begin());
+		std::copy(passiveNodesGrid.begin(), passiveNodesGrid.end(), placementMap.begin());
+		std::copy(passiveNodesGrid.begin(), passiveNodesGrid.end(), step2predMap.begin());
+		std::copy(passiveNodesGrid.begin(), passiveNodesGrid.end(), predictedMap.begin());
+		
+
+		for (shared_ptr<Node> pNode : nodesdeque)
+		{
+			pNode->computePosForFrame(frame);
+			currentMap[pNode->curPos.y][pNode->curPos.x].SetType(CellType::ET_NODE);
+			currentMap[pNode->curPos.y][pNode->curPos.x].pNode = pNode.get();
+		}
+		//apply bombs on currentMap
+		std::deque<Bomb>::iterator iter = bombsdeque.begin();
+		while (iter != bombsdeque.end())
+		{
+			if (iter->frameExplodes == frame)
+			{//applyBomb to currentMap
+				//Bomb bomb = *iter;
+				applyExplosion(currentMap,iter->x, iter->y);
+				iter = bombsdeque.erase(iter);
+			}
+			else
+			{
+				++iter;
+			}
+		}
+		nodesdesque_t nodesdeque_local;
+		//copy nodes
+		copy_if_gm(nodesdeque.begin(), nodesdeque.end(), back_inserter(nodesdeque_local), [](const shared_ptr<Node>& pNode) { return !pNode->b_eliminated; });
+
+		for (shared_ptr<Node> pNode : nodesdeque_local)
+		{
+			pNode->computePosForFrame(frame+1);
+			placementMap[pNode->curPos.y][pNode->curPos.x].SetType(CellType::ET_NODE);
+			placementMap[pNode->curPos.y][pNode->curPos.x].pNode = pNode.get();
+		}
+		
+		iter = bombsdeque.begin();
+		while (iter != bombsdeque.end())
+		{
+			if (iter->frameExplodes == frame+1)
+			{//applyBomb to currentMap
+				//Bomb bomb = *iter;
+				//TODO - save somehow the removed positions - maybe useful
+				applyExplosionWithTrack(placementMap,placementMap, iter->x, iter->y);
+				
+			}
+			++iter;
+		}
+		//remove nodes
+		remove_if(nodesdeque_local.begin(),nodesdeque.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; });
+
+		for (shared_ptr<Node> pNode : nodesdeque_local)
+		{
+			pNode->computePosForFrame(frame + 1);
+			placementMap[pNode->curPos.y][pNode->curPos.x].SetType(CellType::ET_NODE);
+			placementMap[pNode->curPos.y][pNode->curPos.x].pNode = pNode.get();
+		}
+
+		iter = bombsdeque.begin();
+		while (iter != bombsdeque.end())
+		{
+			if (iter->frameExplodes == frame + 2)
+			{//applyBomb to currentMap
+				//Bomb bomb = *iter;
+				//TODO - save somehow the removed positions - maybe useful
+				applyExplosionWithTrack(step2predMap, placementMap, iter->x, iter->y);
+
+			}
+			++iter;
+		}
+		//remove nodes
+		remove_if(nodesdeque_local.begin(), nodesdeque.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; });
+
+
+		for (shared_ptr<Node> pNode : nodesdeque_local)
+		{
+			pNode->computePosForFrame(frame + 3);
+			predictedMap[pNode->curPos.y][pNode->curPos.x].SetType(CellType::ET_NODE);
+			predictedMap[pNode->curPos.y][pNode->curPos.x].pNode = pNode.get();
+		}
+
+		//now place a bomb in free space
+		
+		//fill in placement map
+
+		//std::cout << "frame " << frame << " posX " << pNode->curPos.x << " posY " << pNode->curPos.y << std::endl;
 	
+		return true;
 	};
 
 };
@@ -729,27 +1119,15 @@ public:
 		{
 			for (int x = 0; x < width; x++)
 			{
-
 				if (initNodeGrid[y][x] != NULL)
-				{
+				{ 
 					delete initNodeGrid[y][x];
 				}
-
 
 			}
 		}
 
 	};
-
-	shared_ptr<GameField> createGameField()
-	{
-		//find nodes and their boundaries
-
-	}
-
-
-
-
 };
 
 
@@ -776,6 +1154,8 @@ int main()
 	//test with test 7 of Vox Codei
 	width = 12;
 	height = 9;
+
+	GameField game(width,height);
 	
 	vector<string> initList =
 	{
@@ -803,8 +1183,9 @@ int main()
 	// game loop
 	int simrounds = 1;
 	int initrounds = 0;
-
-	while (simrounds < 5) {
+	int bombs = 7;
+	int rounds = 50;
+	while (simrounds < 50) {
 		/*
 		int rounds; // number of rounds left before the end of the game
 		int bombs; // number of bombs left
@@ -825,6 +1206,7 @@ int main()
 			//init
 			//initrounds = rounds;
 			pDetection.reset(new Detection(width, height, initList));
+			game.init(pDetection->passivenodesgrid);
 			break;
 		case 2:
 			initList = {
@@ -861,11 +1243,19 @@ int main()
 				//resolve undecided
 				pDetection->analyseUndecided();
 			}
+			for (Node* pNode : pDetection->nodesDeque)
+			{
+				game.nodesdeque.push_back(pNode->clone());
+			}
+			
+			game.rounds = rounds;
+			game.simulate(simrounds, bombs);
 			break;
 		default:
 			//simulate
 			//test so far
-			Node* pNode = pDetection->nodesDeque[0];
+			//Node* pNode = pDetection->nodesDeque[0];
+			/*
 			for (int frame = 1; frame <= 100; frame++)
 			{
 				//for (Node* pNode : pDetection->nodesDeque)
@@ -877,6 +1267,9 @@ int main()
 				std::cout << "frame " << frame <<" posX " << pNode->curPos.x  << " posY " << pNode->curPos.y << std::endl;
 				bool stop = true;
 			}
+			*/
+    		
+			
 			break;
 
 		}
