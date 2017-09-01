@@ -40,14 +40,14 @@ enum Directions
 
 class vec2d {
 public:
-	float x;
-	float y;
+	int x;
+	int y;
 	vec2d() :x(0), y(0)
 	{};
 	vec2d(int initX, int initY) : x(initX), y(initY)
 	{};
 
-	float& operator[] (size_t i)
+	int& operator[] (size_t i)
 	{
 		switch (i) {
 		case 0: return x;
@@ -66,7 +66,7 @@ class Bomb {
 public:
 	Bomb(int _x, int _y, int frame) :x(_x), y(_y), tickCounter(0), framePlaced(frame)
 	{
-		frameExplodes = framePlaced + 3;
+		frameExplodes = framePlaced + 2;
 	}
 	int x, y;
 	int framePlaced;
@@ -331,6 +331,15 @@ typedef std::deque <shared_ptr<Node>> nodesdesque_t;
 
 struct Possibility
 {
+	Possibility(int _x, int _y, int _roundPlaced, int _roundActed) :x(_x), y(_y),
+		roundActed(_roundActed),roundPlaced(_roundPlaced)
+	{
+		score = 0;
+		scoreWithRange = 0;
+		scoreWithSingles = 0;
+		numMoving = 0;
+		sumRangeOfMoving = 0;
+	}
 	int x, y; //coordinates of the point
 	int roundActed;
 	int roundPlaced;//
@@ -345,6 +354,16 @@ struct Possibility
 
 typedef std::deque <Possibility>  possibilitiesdeque_t;
 typedef std::deque <Bomb>  bombsdeque_t;
+
+template<class InputIterator, class OutputIterator>
+OutputIterator copy_gm(InputIterator first, InputIterator last, OutputIterator result)
+{
+	while (first != last) {
+		*result = (*first)->clone();;
+		++result; ++first;
+	}
+	return result;
+}
 
 template<class InputIt, class OutputIt, class UnaryPredicate>
 OutputIt copy_if_gm(InputIt first, InputIt last,
@@ -454,7 +473,7 @@ public:
 		}
 	}
 
-	int calcScore(grid_t&  grid, Possibility& possibility, int x, int y)
+	int calcScore(grid_t&  grid, shared_ptr<Possibility>& possibility, int x, int y)
 	{
 		int damage = 0;
 		if (grid[y][x] == CellType::ET_NODE)
@@ -462,8 +481,8 @@ public:
 			damage++;
 			if (grid[y][x].pNode->GetType() == Node::HORIZONTAL || grid[y][x].pNode->GetType() == Node::VERTICAL)
 			{
-				possibility.numMoving++;
-				possibility.sumRangeOfMoving+= grid[y][x].pNode->width;
+				possibility->numMoving++;
+				possibility->sumRangeOfMoving+= grid[y][x].pNode->width;
 			}
 			
 		}
@@ -476,8 +495,8 @@ public:
 				damage++;
 				if (grid[y][i].pNode->GetType() == Node::HORIZONTAL || grid[y][i].pNode->GetType() == Node::VERTICAL)
 				{
-					possibility.numMoving++;
-					possibility.sumRangeOfMoving += grid[y][i].pNode->width;
+					possibility->numMoving++;
+					possibility->sumRangeOfMoving += grid[y][i].pNode->width;
 				}
 			}
 		}
@@ -490,8 +509,8 @@ public:
 				damage++;
 				if (grid[y][i].pNode->GetType() == Node::HORIZONTAL || grid[y][i].pNode->GetType() == Node::VERTICAL)
 				{
-					possibility.numMoving++;
-					possibility.sumRangeOfMoving += grid[y][i].pNode->width;
+					possibility->numMoving++;
+					possibility->sumRangeOfMoving += grid[y][i].pNode->width;
 				}
 			}
 		}
@@ -504,8 +523,8 @@ public:
 				damage++;
 				if (grid[i][x].pNode->GetType() == Node::HORIZONTAL || grid[i][x].pNode->GetType() == Node::VERTICAL)
 				{
-					possibility.numMoving++;
-					possibility.sumRangeOfMoving += grid[i][x].pNode->width;
+					possibility->numMoving++;
+					possibility->sumRangeOfMoving += grid[i][x].pNode->width;
 				}
 			}
 		}
@@ -518,12 +537,12 @@ public:
 				damage++;
 				if (grid[i][x].pNode->GetType() == Node::HORIZONTAL || grid[i][x].pNode->GetType() == Node::VERTICAL)
 				{
-					possibility.numMoving++;
-					possibility.sumRangeOfMoving += grid[i][x].pNode->width;
+					possibility->numMoving++;
+					possibility->sumRangeOfMoving += grid[i][x].pNode->width;
 				}
 			}
 		}
-		possibility.score = damage;
+		possibility->score = damage;
 		return damage;
 	}
 
@@ -601,10 +620,22 @@ public:
 	
 	bool simulate(int frame, int& bombs)
 	{
+		
 		//1 - render map where we place a bomb
+		//temp one bomb
 
+		int remains = nodesdeque.size();
+		if (remains == 0) {
+			// no more nodes to blow
+			return true;//seq;
+		}
+		if (bombs == 0) {
+			// no more bombs
+			return false;
+		}
+		
 		// compute possible bomb locations
-		vector<Possibility> possibles = {};
+		vector<shared_ptr<Possibility>> possibles = {};
 		//simulate current map, remove nodes which are affected by current bomb
 		//
 		//clear
@@ -637,7 +668,8 @@ public:
 		}
 		nodesdesque_t nodesdeque_local;
 		//copy nodes
-		copy_if_gm(nodesdeque.begin(), nodesdeque.end(), back_inserter(nodesdeque_local), [](const shared_ptr<Node>& pNode) { return !pNode->b_eliminated; });
+		nodesdeque.erase(remove_if(nodesdeque.begin(), nodesdeque.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; }), nodesdeque.end());
+		copy_gm(nodesdeque.begin(), nodesdeque.end(), back_inserter(nodesdeque_local));
 
 		for (shared_ptr<Node> pNode : nodesdeque_local)
 		{
@@ -659,13 +691,13 @@ public:
 			++iter;
 		}
 		//remove nodes
-		remove_if(nodesdeque_local.begin(),nodesdeque.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; });
+		nodesdeque_local.erase(remove_if(nodesdeque_local.begin(), nodesdeque_local.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; }), nodesdeque_local.end());
 
 		for (shared_ptr<Node> pNode : nodesdeque_local)
 		{
-			pNode->computePosForFrame(frame + 1);
-			placementMap[pNode->curPos.y][pNode->curPos.x].SetType(CellType::ET_NODE);
-			placementMap[pNode->curPos.y][pNode->curPos.x].pNode = pNode.get();
+			pNode->computePosForFrame(frame + 2);
+			step2predMap[pNode->curPos.y][pNode->curPos.x].SetType(CellType::ET_NODE);
+			step2predMap[pNode->curPos.y][pNode->curPos.x].pNode = pNode.get();
 		}
 
 		iter = bombsdeque.begin();
@@ -681,7 +713,7 @@ public:
 			++iter;
 		}
 		//remove nodes
-		remove_if(nodesdeque_local.begin(), nodesdeque.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; });
+		nodesdeque_local.erase(remove_if(nodesdeque_local.begin(), nodesdeque_local.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; }),nodesdeque_local.end());
 
 
 		for (shared_ptr<Node> pNode : nodesdeque_local)
@@ -693,7 +725,49 @@ public:
 
 		//now place a bomb in free space
 		
-		//fill in placement map
+		
+		remains = nodesdeque_local.size();
+		if (remains == 0)
+		{
+			return true;
+		}
+		for (size_t y = 0; y < currentMap.size(); y++)
+		{
+			for (size_t x = 0; x < currentMap[y].size(); x++)
+			{
+				CellType cell = currentMap[y][x];
+				if (cell == CellType::ET_EMPTY)
+				{
+					shared_ptr<Possibility> possibility = make_shared<Possibility>((int)x, (int)y,frame+1,frame+3);
+					int count = calcScore(predictedMap, possibility, x, y);
+					//int desiredCount = std::max({ remains / bombs, remains*2 / frame - 3, 1 });
+					int desiredCount = 1;
+					if(frame<10)
+					{ 
+						desiredCount = 2;
+					}
+					if (count == remains || count >=desiredCount) {//aims at least for two cells ok.
+						possibles.push_back(possibility);
+					}
+				}
+			}
+		}
+		
+		sort(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& a, const shared_ptr<Possibility>& b) { return b->score < a->score; });
+
+		if (bombs > 0)
+		{
+			if (possibles.size())
+			{
+				if (possibles[0]->score > 0)
+				{
+					bombsdeque.push_back(Bomb(possibles[0]->x, possibles[0]->y, possibles[0]->roundPlaced));
+					bombs--;
+				}
+				
+			}
+			
+		}
 
 		//std::cout << "frame " << frame << " posX " << pNode->curPos.x << " posY " << pNode->curPos.y << std::endl;
 	
@@ -791,6 +865,7 @@ public:
 			}
 
 		}
+		/*
 		std::fstream	of0("Map0.txt", std::ios::out | std::ios::trunc);
 
 		if (of0.is_open())
@@ -805,6 +880,7 @@ public:
 			}
 			of0.close();
 		}
+		*/
 	}
 
 	void addThirdFrame(vector<string>& initList)
@@ -898,13 +974,13 @@ public:
 					break;
 				}
 			};
-			pNode->initBoundaries(Node::HORIZONTAL, (direction == LEFT) ? -1 : 1, height, leftObstacle, rigthObstacle);
+			pNode->initBoundaries(Node::HORIZONTAL, (direction == LEFT) ? -1 : 1, width, leftObstacle, rigthObstacle);
 			//pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width, leftObstacle, rigthObstacle);
 
 		}
 		else
 		{
-			pNode->initBoundaries(Node::HORIZONTAL, (direction == LEFT) ? -1 : 1, height);
+			pNode->initBoundaries(Node::HORIZONTAL, (direction == LEFT) ? -1 : 1, width);
 			//pNode->initHorizontalBoundaries(static_cast<Directions>(direction), width);
 		}
 
@@ -994,7 +1070,6 @@ public:
 						case DOWN:
 							caseUpDown(x, y, direction, initNodeGrid[y][x]);
 							
-							
 							break;
 						case LEFT:
 						case RIGHT:
@@ -1030,7 +1105,8 @@ public:
 				patterngrid[pNode->curPos.y][pNode->curPos.x] = 0;
 			}
 		}
- 
+      
+		/*
 		std::fstream	ofc("MapCleaned.txt", std::ios::out | std::ios::trunc);
 
 		if (ofc.is_open())
@@ -1045,6 +1121,7 @@ public:
 			}
 			ofc.close();
 		}
+		*/
 		//let's deal with undecided - so far just an attempt
 
 		return undecidednodesDeque.size();
@@ -1147,28 +1224,31 @@ public:
 **/
 int main()
 {
+	bool real = false;
+
 	int width; // width of the firewall grid
 	int height; // height of the firewall grid
-	//cin >> width >> height; cin.ignore();
+	if (real)
+	{
+		cin >> width >> height; cin.ignore();
+		cerr << "width " << width << " height " << height << endl;
+	}
+	else
+	{
+		width = 12;
+		height = 9;
+	}
+
+		
 	
-	//test with test 7 of Vox Codei
-	width = 12;
-	height = 9;
+	
+
+	int rounds; // number of rounds left before the end of the game
+	int bombs; // number of bombs left
+	
 
 	GameField game(width,height);
-	
-	vector<string> initList =
-	{
-		"..@....@....",
-		"...........@",
-		".@..........",
-		".....@......",
-		"@...........",
-		"............",
-		"............",
-		".@..........",
-		"............",
-	};
+	vector<string> initList = {};
 	
 	
 	
@@ -1182,60 +1262,94 @@ int main()
 
 	// game loop
 	int simrounds = 1;
-	int initrounds = 0;
-	int bombs = 7;
-	int rounds = 50;
-	while (simrounds < 50) {
-		/*
-		int rounds; // number of rounds left before the end of the game
-		int bombs; // number of bombs left
-		cin >> rounds >> bombs; cin.ignore();
-		cerr << "bombs " << bombs << endl;
-		initList.clear();
-		for (int i = 0; i < height; i++) {
-			string mapRow; // one line of the firewall grid
-			getline(cin, mapRow);
-			//add mapRow to array
-			initList.push_back(mapRow);
-			cerr << "mapRow " << i << " " << mapRow << endl;
+	if (!real)
+	{
+		rounds = 51;
+		bombs = 7;
+	}
+
+	while (1) {
+		
+		
+		//initList.clear();
+		//int rounds; // number of rounds left before the end of the game
+		//int bombs; // number of bombs left
+		if (real)
+		{
+			cin >> rounds >> bombs; cin.ignore();
+			cerr << "bombs " << bombs << endl;
+			initList.clear();
+			for (int i = 0; i < height; i++) {
+				string mapRow; // one line of the firewall grid
+				getline(cin, mapRow);
+				
+				initList.push_back(mapRow);
+				//add mapRow to array
+				//cerr << "mapRow " << i << " " << mapRow << endl;//again
+				
+			}
 		}
-		*/
+		else
+		{
+			rounds = 30 - simrounds;
+		}
 		switch (simrounds)
 		{
 		case 1:
+			if (!real)
+			{
+				initList =
+				{
+					"..@....@....",
+					"...........@",
+					".@..........",
+					".....@......",
+					"@...........",
+					"............",
+					"............",
+					".@..........",
+					"............",
+				};
+			}
 			//init
 			//initrounds = rounds;
 			pDetection.reset(new Detection(width, height, initList));
 			game.init(pDetection->passivenodesgrid);
 			break;
 		case 2:
-			initList = {
-				"..@........@",
-				".......@....",
-				"@...........",
-				"............",
-				".@...@......",
-				"............",
-				"............",
-				"..@.........",
-				"............",
-			};
+			if (!real)
+			{
+				initList = {
+					"..@........@",
+					".......@....",
+					"@...........",
+					"............",
+					".@...@......",
+					"............",
+					"............",
+					"..@.........",
+					"............",
+				};
+			}
 			//add second frame
 			pDetection->addSecondFrame(initList);
 			break;
 		case 3:
 			//add third frame, init all
-			initList = {
-				"..@.........",
-				"...........@",
-				".@.....@....",
-				"............",
-				"..@.........",
-				".....@......",
-				"............",
-				"...@........",
-				"............",
-			};
+			if (!real)
+			{
+				initList = {
+					"..@.........",
+					"...........@",
+					".@.....@....",
+					"............",
+					"..@.........",
+					".....@......",
+					"............",
+					"...@........",
+					"............",
+				};
+			}
 			pDetection->addThirdFrame(initList);
 			pDetection->analyseThirdFrame(initList);
 			while (pDetection->undecidednodesDeque.size())
@@ -1252,35 +1366,33 @@ int main()
 			game.simulate(simrounds, bombs);
 			break;
 		default:
-			//simulate
-			//test so far
-			//Node* pNode = pDetection->nodesDeque[0];
-			/*
-			for (int frame = 1; frame <= 100; frame++)
-			{
-				//for (Node* pNode : pDetection->nodesDeque)
-				
-				{
-					pNode->computePosForFrame(frame);
-					bool stop = true;
-				}
-				std::cout << "frame " << frame <<" posX " << pNode->curPos.x  << " posY " << pNode->curPos.y << std::endl;
-				bool stop = true;
-			}
-			*/
-    		
+			game.simulate(simrounds, bombs);
+			   		
 			
 			break;
 
 		}
+
 		//int rounds; // number of rounds left before the end of the game
 		//int bombs; // number of bombs left
 		//cin >> rounds >> bombs; cin.ignore();
 		//cerr << "rounds " << rounds << "bombs " << bombs << endl;
 		//test
+		deque<Bomb>::iterator it = find_if(game.bombsdeque.begin(), game.bombsdeque.end(), [&simrounds](const Bomb& bomb) { return bomb.framePlaced-1 == simrounds; });
+		if (it != game.bombsdeque.end())
+		{
+			cout << it->x << " " << it->y << endl;
+		}
+		else
+		{
+			std::cout << "WAIT" << std::endl;
+		}
 		
-		std::cout << "WAIT" << std::endl;
 		simrounds++;
+		if (simrounds > 51)
+		{
+			break;
+		}
 	}
 	
 		
