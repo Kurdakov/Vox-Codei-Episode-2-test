@@ -725,7 +725,14 @@ public:
 
 		//now place a bomb in free space
 		
+		int numstatics = count_if(nodesdeque_local.begin(), nodesdeque_local.end(), [](const shared_ptr<Node>& pNode) { return pNode->m_type == Node::NodeType::STATIC; });
+		int numdynamics = nodesdeque_local.size() - numstatics;
 		
+		bool preferDynamics = false;
+		if (numdynamics*1.5 > numstatics)
+		{
+			preferDynamics = true;
+		}
 		remains = nodesdeque_local.size();
 		if (remains == 0)
 		{
@@ -758,6 +765,10 @@ public:
 		}
 		
 		sort(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& a, const shared_ptr<Possibility>& b) { return b->score < a->score; });
+		if (preferDynamics)
+		{
+			possibles.erase(remove_if(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& pNode) { return (pNode->numMoving == 0); }), possibles.end());
+		}
 
 		if (bombs > 0)
 		{
@@ -1206,8 +1217,8 @@ int main()
 	}
 	else
 	{
-		width = 12;
-		height = 9;
+		width = 16;
+		height = 12;
 	}
 
 		
@@ -1271,15 +1282,19 @@ int main()
 			{
 				initList =
 				{
-					".#.@........",
-					"..#......@..",
-					"......@..#..",
-					".....@....#.",
-					"....@...#...",
-					"...@.......#",
-					"..@......#..",
-					".@......#...",
-					"@......#....",
+					"##..@...##@@@.@@",
+					"##.....#.##..@..",
+					"..#...#..#######",
+					"...#@#...##@...#",
+					"@..@.@..@#....#.",
+					"...#@#####...#..",
+					"..#...#...#@#...",
+					".#....#@..@.@..@",
+					"#...@.##..#@#...",
+					"#######@##...#..",
+					"......@.@#....##",
+					"@.........#@..#.",
+					
 				};
 			}
 			//init
@@ -1291,15 +1306,19 @@ int main()
 			if (!real)
 			{
 				initList = {
-					".#..@.......",
-					"..#.....@...",
-					".......@.#..",
-					"......@...#.",
-					".....@..#...",
-					"....@......#",
-					"...@.....#..",
-					"..@.....#...",
-					".@.....#....",
+					"##.@....##@@@.@@",
+					"##.....#.##.@...",
+					"..#...#..#######",
+					"...#@#..@##.@..#",
+					"...@.@...#....#.",
+					"@..#@#####...#..",
+					"..#...#@..#@#...",
+					".#....#...@.@...",
+					"#..@..##..#@#..@",
+					"#######@##...#..",
+					"......@.@#....##",
+					".@........#.@.#.",
+
 				};
 			}
 			//add second frame
@@ -1310,15 +1329,18 @@ int main()
 			if (!real)
 			{
 				initList = {
-					".#...@......",
-					"..#....@....",
-					"........@#..",
-					".......@..#.",
-					"......@.#...",
-					".....@.....#",
-					"....@....#..",
-					"...@....#...",
-					"..@....#....",
+					"##@.....##@@@.@@",
+					"##.....#.##@....",
+					"..#...#.@#######",
+					"...#@#...##..@.#",
+					"...@.@...#....#.",
+					"...#@#####...#..",
+					"@.#...#...#@#...",
+					".#....#@..@.@...",
+					"#.@...##..#@#...",
+					"#######@##...#.@",
+					"......@.@#....##",
+					"..@.......#..@#.",
 				};
 			}
 			pDetection->addThirdFrame(initList);
@@ -1360,7 +1382,7 @@ int main()
 		}
 		
 		simrounds++;
-		if (simrounds > 51)
+		if (simrounds > 101)
 		{
 			break;
 		}
