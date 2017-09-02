@@ -658,7 +658,7 @@ public:
 			if (iter->frameExplodes == frame)
 			{//applyBomb to currentMap
 				//Bomb bomb = *iter;
-				applyExplosion(currentMap,iter->x, iter->y);
+				applyExplosionWithTrack(currentMap,currentMap,iter->x, iter->y);
 				iter = bombsdeque.erase(iter);
 			}
 			else
