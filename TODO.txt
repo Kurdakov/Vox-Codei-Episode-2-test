@@ -24,5 +24,16 @@ so seems following things are needed:
 		- possibly there will be (unlike first game, where all computations were done before first output of command) time limit on depth of search. 
 		So successive deepening likely won't give final solution, but should at least answer following question - wait at this step, or apply current
 		best bomb, hopefully it will be possible to figure answer to this quesion in one computational step time ( 0.1 sec as I understand )
+4. update 02.09.2017
+	pass 9 tests of 10. What can be tried? First - from game screen it is clear, that killing those moving objects together with statics is a priority 
+	over eliminating of max number of blocks which might lead to unsatisfactory solution.
+	though this approach might clash with 'patience' 09 test where killing moving objects together with statics - might lead to loss but still if I beat 10th test
+	then I could tune it to fit 09 test.  Another approach comes out of the fact, that best killing of max blocks creates 'alone' blocks which need a separate bomb.
+	So I might to track those moving blocks which accumulate as 'alone' after applying currently selected bomb,
+	if then there are more 'alone' blocks than available bombs just do not apply currently selected best position and look for next 'best' position which will
+	not create alone blocks.
+	
+	
+		
 	
 	
