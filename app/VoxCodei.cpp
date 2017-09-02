@@ -685,7 +685,7 @@ public:
 			{//applyBomb to currentMap
 				//Bomb bomb = *iter;
 				//TODO - save somehow the removed positions - maybe useful
-				applyExplosionWithTrack(placementMap,placementMap, iter->x, iter->y);
+				applyExplosionWithTrack(placementMap, currentMap, iter->x, iter->y);
 				
 			}
 			++iter;
@@ -707,7 +707,7 @@ public:
 			{//applyBomb to currentMap
 				//Bomb bomb = *iter;
 				//TODO - save somehow the removed positions - maybe useful
-				applyExplosionWithTrack(step2predMap, placementMap, iter->x, iter->y);
+				applyExplosionWithTrack(step2predMap, currentMap, iter->x, iter->y);
 
 			}
 			++iter;
@@ -740,13 +740,17 @@ public:
 				{
 					shared_ptr<Possibility> possibility = make_shared<Possibility>((int)x, (int)y,frame+1,frame+3);
 					int count = calcScore(predictedMap, possibility, x, y);
-					//int desiredCount = std::max({ remains / bombs, remains*2 / frame - 3, 1 });
-					int desiredCount = 1;
-					if(frame<10)
-					{ 
-						desiredCount = 2;
-					}
-					if (count == remains || count >=desiredCount) {//aims at least for two cells ok.
+					int desiredCount = std::max({ remains / bombs, remains*2 / frame - 3, 1 });
+					//int desiredCount = 1;
+					//if(frame<10)
+					//{ 
+					//	desiredCount = 2;
+					//}
+					//else if (bombs == 1)
+					//{
+					//	desiredCount = remains;
+					//}
+					if (count == remains || count >=desiredCount ) {//aims at least for two cells ok.
 						possibles.push_back(possibility);
 					}
 				}
@@ -781,8 +785,7 @@ public:
 
 class Detection {
 public:
-	string* initListInt;
-	//grid_t grid[3];//detection frames
+	
 	intgrid_t patterngrid;
 	intgrid_t passivenodesgrid;
 	vector<bool> hasObstaclesInRow;//y - height -> row change
@@ -865,22 +868,6 @@ public:
 			}
 
 		}
-		/*
-		std::fstream	of0("Map0.txt", std::ios::out | std::ios::trunc);
-
-		if (of0.is_open())
-		{
-			for (int y = 0; y < height; ++y)
-			{
-				for (int x = 0; x < width; ++x)
-				{
-					of0 << patterngrid[y][x] << " ";
-				}
-				of0 << "\n";
-			}
-			of0.close();
-		}
-		*/
 	}
 
 	void addThirdFrame(vector<string>& initList)
@@ -1106,23 +1093,7 @@ public:
 			}
 		}
       
-		/*
-		std::fstream	ofc("MapCleaned.txt", std::ios::out | std::ios::trunc);
-
-		if (ofc.is_open())
-		{
-			for (int y = 0; y < height; ++y)
-			{
-				for (int x = 0; x < width; ++x)
-				{
-					ofc << patterngrid[y][x] << " ";
-				}
-				ofc << "\n";
-			}
-			ofc.close();
-		}
-		*/
-		//let's deal with undecided - so far just an attempt
+		//let's deal with undecided
 
 		return undecidednodesDeque.size();
 
