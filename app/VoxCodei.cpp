@@ -118,6 +118,7 @@ public:
 		initRange = 0;
 		travelRange = 0;
 		additionalTimefornode = 0;
+		b_isbounded = false;
 		
 	};
 	
@@ -129,6 +130,7 @@ public:
 		initRange = 0;
 		travelRange = 0;
 		additionalTimefornode = 0;
+		b_isbounded = false;
 	};
 
 	
@@ -144,6 +146,7 @@ public:
 		pNode->travelRange = travelRange;
 		pNode->additionalTimefornode = additionalTimefornode;
 		pNode->b_eliminated = b_eliminated;
+		pNode->b_isbounded = b_isbounded;
 
 		return pNode;
 	}
@@ -168,10 +171,10 @@ public:
 	int initRange;
 	int travelRange;
 	bool b_eliminated;
-	
+	bool b_isbounded;
 
 	void computePosOnFrame(int frameNum) {};
-	void renderToMap() {};
+	
 
 	void initUndecided()
 	{
@@ -214,6 +217,7 @@ public:
 			{//RIGHT
 				additionalTimefornode = initPos[m_type] - (boundary1 + 1);
 			}
+			b_isbounded = true;
 		}
 		if (boundary1 != -1 && boundary2 == -1)
 		{
@@ -228,6 +232,7 @@ public:
 			{//RIGHT
 				additionalTimefornode = initPos[m_type] - (boundary1 + 1);
 			}
+			b_isbounded = true;
 		}
 		if (boundary1 == -1 && boundary2 != -1)
 		{
@@ -242,6 +247,7 @@ public:
 			{//RIGHT bottom
 				additionalTimefornode = initPos[m_type];
 			}
+			b_isbounded = true;
 		}
 
 
@@ -337,7 +343,7 @@ struct Possibility
 		score = 0;
 		scoreWithRange = 0;
 		scoreWithSingles = 0;
-		numMoving = 0;
+		numBounded = 0;
 		sumRangeOfMoving = 0;
 	}
 	int x, y; //coordinates of the point
@@ -346,7 +352,7 @@ struct Possibility
 	int score;
 	int scoreWithRange;
 	int scoreWithSingles;
-	int numMoving;
+	int numBounded;
 	int sumRangeOfMoving;
 	//list<Node*> affectedNodesList;//?
 
@@ -386,6 +392,7 @@ public:
 		placementMap.resize(height);
 		step2predMap.resize(height);
 		predictedMap.resize(height);
+		isLastTest = false;
 	};
 	int width, height;
 	int numBombs;
@@ -399,6 +406,8 @@ public:
 	bombsdeque_t bombsdeque;
 	possibilitiesdeque_t possibilitiesdeque;
 	nodesdesque_t nodesdeque;
+	bool isLastTest;
+
 	void init(intgrid_t& passivenodesgrid)
 	{
 		for (int y = 0; y < height; y++) {
@@ -479,10 +488,10 @@ public:
 		if (grid[y][x] == CellType::ET_NODE)
 		{
 			damage++;
-			if (grid[y][x].pNode->GetType() == Node::HORIZONTAL || grid[y][x].pNode->GetType() == Node::VERTICAL)
+			if (grid[y][x].pNode->b_isbounded)
 			{
-				possibility->numMoving++;
-				possibility->sumRangeOfMoving+= grid[y][x].pNode->width;
+				possibility->numBounded++;
+				//possibility->sumRangeOfMoving+= grid[y][x].pNode->width;
 			}
 			
 		}
@@ -493,10 +502,9 @@ public:
 			else if (grid[y][i] == CellType::ET_NODE)
 			{
 				damage++;
-				if (grid[y][i].pNode->GetType() == Node::HORIZONTAL || grid[y][i].pNode->GetType() == Node::VERTICAL)
+				if (grid[y][i].pNode->b_isbounded)
 				{
-					possibility->numMoving++;
-					possibility->sumRangeOfMoving += grid[y][i].pNode->width;
+					possibility->numBounded++;
 				}
 			}
 		}
@@ -507,10 +515,9 @@ public:
 			else if (grid[y][i] == CellType::ET_NODE)
 			{
 				damage++;
-				if (grid[y][i].pNode->GetType() == Node::HORIZONTAL || grid[y][i].pNode->GetType() == Node::VERTICAL)
+				if (grid[y][i].pNode->b_isbounded)
 				{
-					possibility->numMoving++;
-					possibility->sumRangeOfMoving += grid[y][i].pNode->width;
+					possibility->numBounded++;
 				}
 			}
 		}
@@ -521,10 +528,9 @@ public:
 			else if (grid[i][x] == CellType::ET_NODE)
 			{
 				damage++;
-				if (grid[i][x].pNode->GetType() == Node::HORIZONTAL || grid[i][x].pNode->GetType() == Node::VERTICAL)
+				if (grid[i][x].pNode->b_isbounded)
 				{
-					possibility->numMoving++;
-					possibility->sumRangeOfMoving += grid[i][x].pNode->width;
+					possibility->numBounded;
 				}
 			}
 		}
@@ -535,10 +541,9 @@ public:
 			else if (grid[i][x] == CellType::ET_NODE)
 			{
 				damage++;
-				if (grid[i][x].pNode->GetType() == Node::HORIZONTAL || grid[i][x].pNode->GetType() == Node::VERTICAL)
+				if (grid[i][x].pNode->b_isbounded)
 				{
-					possibility->numMoving++;
-					possibility->sumRangeOfMoving += grid[i][x].pNode->width;
+					possibility->numBounded++;
 				}
 			}
 		}
@@ -633,6 +638,14 @@ public:
 			// no more bombs
 			return false;
 		}
+
+		int numBounded = count_if(nodesdeque.begin(), nodesdeque.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_isbounded; });
+		if (numBounded == bombs)
+		{
+			//last test detected - we have isolated regions equal to bombs each requires one bomb
+			isLastTest = true;
+		}
+
 		
 		// compute possible bomb locations
 		vector<shared_ptr<Possibility>> possibles = {};
@@ -725,14 +738,10 @@ public:
 
 		//now place a bomb in free space
 		
-		int numstatics = count_if(nodesdeque_local.begin(), nodesdeque_local.end(), [](const shared_ptr<Node>& pNode) { return pNode->m_type == Node::NodeType::STATIC; });
-		int numdynamics = nodesdeque_local.size() - numstatics;
+		int stillBounded = count_if(nodesdeque_local.begin(), nodesdeque_local.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_isbounded; });
 		
-		bool preferDynamics = false;
-		if (numdynamics*1.5 > numstatics)
-		{
-			preferDynamics = true;
-		}
+		
+		
 		remains = nodesdeque_local.size();
 		if (remains == 0)
 		{
@@ -747,16 +756,13 @@ public:
 				{
 					shared_ptr<Possibility> possibility = make_shared<Possibility>((int)x, (int)y,frame+1,frame+3);
 					int count = calcScore(predictedMap, possibility, x, y);
-					int desiredCount = std::max({ remains / bombs, remains*2 / frame - 3, 1 });
-					//int desiredCount = 1;
-					//if(frame<10)
-					//{ 
-					//	desiredCount = 2;
-					//}
-					//else if (bombs == 1)
-					//{
-					//	desiredCount = remains;
-					//}
+					int desiredCount = std::max({ remains / bombs, 1 });
+					if (isLastTest)
+					{
+						//slowly decrease desiredCount to find all 'big' hits
+						desiredCount = std::max({ remains / bombs, int (remains / (frame*0.05)) - 3,1 });
+					}
+
 					if (count == remains || count >=desiredCount ) {//aims at least for two cells ok.
 						possibles.push_back(possibility);
 					}
@@ -765,9 +771,10 @@ public:
 		}
 		
 		sort(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& a, const shared_ptr<Possibility>& b) { return b->score < a->score; });
-		if (preferDynamics)
+		if (stillBounded>0)
 		{
-			possibles.erase(remove_if(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& pNode) { return (pNode->numMoving == 0); }), possibles.end());
+			possibles.erase(remove_if(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& pNode) { return (pNode->numBounded == 0); }), possibles.end());
+			//now check possibilities for bounded if they could be improved? or for double bounded only? for last test?
 		}
 
 		if (bombs > 0)
@@ -861,7 +868,7 @@ public:
 
 	};
 	//add second frame
-	void addSecondFrame(vector<string>& initList)
+	void addFrame(vector<string>& initList)
 	{
 		for (int y = 0; y < height; y++)//
 		{
@@ -881,29 +888,7 @@ public:
 		}
 	}
 
-	void addThirdFrame(vector<string>& initList)
-	{
-		//print map for first two steps
-
-
-
-		for (int y = 0; y < height; y++)//
-		{
-			string mapRow; // one line of the firewall grid
-						   //cin >> mapRow; cin.ignore();
-			mapRow = initList[y];
-			for (int x = 0; x < width; x++)//first wee look at horizontal line
-			{
-				CellType::EType celltype = static_cast<CellType::EType>(mapRow[x]);
-				if (celltype == CellType::ET_NODE)
-				{
-					patterngrid[y][x]++;
-
-				}
-			}
-
-		};
-	}
+	
 
 	void caseUpDown(int x,int y,int direction, Node* pNode)
 	{
@@ -1246,8 +1231,8 @@ int main()
 	int simrounds = 1;
 	if (!real)
 	{
-		rounds = 51;
-		bombs = 7;
+		rounds = 100;
+		bombs = 10;
 	}
 
 	while (1) {
@@ -1322,7 +1307,7 @@ int main()
 				};
 			}
 			//add second frame
-			pDetection->addSecondFrame(initList);
+			pDetection->addFrame(initList);
 			break;
 		case 3:
 			//add third frame, init all
@@ -1343,7 +1328,7 @@ int main()
 					"..@.......#..@#.",
 				};
 			}
-			pDetection->addThirdFrame(initList);
+			pDetection->addFrame(initList);
 			pDetection->analyseThirdFrame(initList);
 			while (pDetection->undecidednodesDeque.size())
 			{
