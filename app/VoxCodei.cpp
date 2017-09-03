@@ -1142,8 +1142,12 @@ int main()
 
 			pDetection->addFrame(initList);
 			pDetection->analyseThirdFrame(initList);
+			int preventInfinite = 100;
 			while (pDetection->undecidednodesDeque.size())
 			{
+				preventInfinite--;
+				if (preventInfinite < 0)
+					break;
 				//resolve undecided
 				pDetection->analyseUndecided();
 			}
