@@ -1126,6 +1126,8 @@ int main()
 			initList.push_back(mapRow);
 		}
 
+		int preventInfinite = 100;
+
 		switch (simrounds)
 		{
 		case 1:
@@ -1142,7 +1144,7 @@ int main()
 
 			pDetection->addFrame(initList);
 			pDetection->analyseThirdFrame(initList);
-			int preventInfinite = 100;
+			
 			while (pDetection->undecidednodesDeque.size())
 			{
 				preventInfinite--;
