@@ -640,9 +640,6 @@ public:
 			predictedMap[pNode->curPos.y][pNode->curPos.x].pNode = pNode.get();
 		}
 
-		
-		
-		
 
 		int remains = nodesdeque_local.size();
 		if (remains == 0)
@@ -658,7 +655,7 @@ public:
 		//prioritize bounded nodes - because they could be isolates - such that two nodes could not be eliminated with one bomb due to obstruction,
 		//so eliminating them early allows algorithm to move forward.
 		
-		int desiredCount = std::max({ remains / bombs, 1 });
+		//int desiredCount = std::max({ remains / bombs, 1 });
 		
 
 		//now place a bomb in free space
@@ -672,7 +669,7 @@ public:
 					shared_ptr<Possibility> possibility = make_shared<Possibility>((int)x, (int)y, frame + 1, frame + 3);
 					int count = calcScore(predictedMap, possibility, x, y);
 
-					if (count == remains || count >= desiredCount) {
+					if (count == remains || count >= 1) {
 						possibles.push_back(possibility);
 					}
 				}
@@ -682,10 +679,10 @@ public:
 		sort(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& a, const shared_ptr<Possibility>& b) { return b->score < a->score; });
 		
 		//take best possibility
-		if (possibles.size())
+		for (shared_ptr<Possibility> possible : possibles) 
 		{
 			//if (possibles[0]->score > 0) {//reduntant check
-				seq.push_back(possibles[0]);
+				seq.push_back(possible);
 
 				//clone
 				nodesdesque_t nodesdeque_local;
@@ -1117,8 +1114,8 @@ int main()
 	}
 	else
 	{
-		width = 12;
-		height = 9;
+		width = 16;
+		height = 12;
 	}
 
 	//cin >> width >> height; cin.ignore();
@@ -1145,8 +1142,8 @@ int main()
 
   if (!real)
 	{
-		rounds = 30;
-		bombs = 1;
+		rounds = 100;
+		bombs = 10;
 	}
 
 	while (1) {
@@ -1166,11 +1163,7 @@ int main()
 				initList.push_back(mapRow);
 			}
 		}
-        else
-		{
-			rounds = 100;
-		}
-		
+       		
 
 		int preventInfinite = 100;
 
@@ -1181,16 +1174,19 @@ int main()
 			{
 				initList =
 				{
-					"............",
-					"............",
-					"............",
-					"............",
-					".@..........",
-					"............",
-					"............",
-					"............",
-					"............",
-				
+					"##..@...##@@@.@@",
+					"##.....#.##..@..",
+					"..#...#..#######",
+					"...#@#...##@...#",
+					"@..@.@..@#....#.",
+					"...#@#####...#..",
+					"..#...#...#@#...",
+					".#....#@..@.@..@",
+					"#...@.##..#@#...",
+					"#######@##...#..",
+					"......@.@#....##",
+					"@.........#@..#.",
+					
 				};
 			}
 			//init
@@ -1202,15 +1198,19 @@ int main()
 			if (!real)
 			{
 				initList = {
-					"............",
-					"............",
-					"............",
-					"............",
-					"..@.........",
-					"............",
-					"............",
-					"............",
-					"............",
+					"##.@....##@@@.@@",
+					"##.....#.##.@...",
+					"..#...#..#######",
+					"...#@#..@##.@..#",
+					"...@.@...#....#.",
+					"@..#@#####...#..",
+					"..#...#@..#@#...",
+					".#....#...@.@...",
+					"#..@..##..#@#..@",
+					"#######@##...#..",
+					"......@.@#....##",
+					".@........#.@.#.",
+
 				};
 			}
 			//add second frame
@@ -1221,16 +1221,18 @@ int main()
 			if (!real)
 			{
 				initList = {
-					"............",
-					"............",
-					"............",
-					"............",
-					"...@........",
-					"............",
-					"............",
-					"............",
-					"............",
-					
+					"##@.....##@@@.@@",
+					"##.....#.##@....",
+					"..#...#.@#######",
+					"...#@#...##..@.#",
+					"...@.@...#....#.",
+					"...#@#####...#..",
+					"@.#...#...#@#...",
+					".#....#@..@.@...",
+					"#.@...##..#@#...",
+					"#######@##...#.@",
+					"......@.@#....##",
+					"..@.......#..@#.",
 				};
 			}
 			pDetection->addFrame(initList);
@@ -1280,6 +1282,13 @@ int main()
 		
 
 		simrounds++;
+		if (!real)
+		{
+			if (simrounds > 100)
+			{
+				return 1;
+			}
+		}
 
 	}
 
