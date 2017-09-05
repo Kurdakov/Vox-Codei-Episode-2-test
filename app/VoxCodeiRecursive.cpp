@@ -323,12 +323,22 @@ struct Possibility
 	{
 		score = 0;
 		numBounded = 0;
+		b_wait = false;
+	}
+	Possibility(bool _b_wait, int _roundPlaced, int _roundActed) :
+		roundActed(_roundActed), roundPlaced(_roundPlaced), b_wait(_b_wait)
+	{
+		score = 0;
+		numBounded = 0;
+		
 	}
 	int x, y; //coordinates of the point
 	int roundActed;
 	int roundPlaced;//
 	int score;
 	int numBounded;
+	bool b_wait;
+
 
 
 };
@@ -535,9 +545,9 @@ public:
 		}
 	}
 
-	bool simulate(int frame, int& bombs, nodesdesque_t& nodes, deque<shared_ptr<Possibility>>& seq)
+	bool simulate(int frame, int bombs, nodesdesque_t& nodes, deque<shared_ptr<Possibility>>& seq)
 	{
-
+		
 		
 		if (frame >= rounds)
 		{
@@ -568,7 +578,10 @@ public:
 		{
 			if ((*iter)->roundActed == frame)
 			{
-				applyExplosionWithTrack(currentMap, currentMap, (*iter)->x, (*iter)->y);
+				if (!(*iter)->b_wait)
+				{
+					applyExplosionWithTrack(currentMap, currentMap, (*iter)->x, (*iter)->y);
+				}
 				//iter = bombsdeque.erase(iter);
 				++iter;
 			}
@@ -580,6 +593,13 @@ public:
 		nodesdesque_t nodesdeque_local;
 		//copy nodes
 		nodes.erase(remove_if(nodes.begin(), nodes.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; }), nodes.end());
+
+		int remains = nodes.size();
+		if (remains == 0)
+		{
+			return true;
+		}
+
 		copy_gm(nodes.begin(), nodes.end(), back_inserter(nodesdeque_local));
 
 		for (shared_ptr<Node> pNode : nodesdeque_local)
@@ -594,7 +614,10 @@ public:
 		{
 			if ((*iter)->roundActed == frame+1)
 			{
-				applyExplosionWithTrack(placementMap, currentMap, (*iter)->x, (*iter)->y);
+				if (!(*iter)->b_wait)
+				{
+					applyExplosionWithTrack(placementMap, currentMap, (*iter)->x, (*iter)->y);
+				}
 				//iter = bombsdeque.erase(iter);
 				++iter;
 			}
@@ -619,7 +642,10 @@ public:
 		{
 			if ((*iter)->roundActed == frame+2)
 			{
-				applyExplosionWithTrack(step2predMap, currentMap, (*iter)->x, (*iter)->y);
+				if (!(*iter)->b_wait)
+				{
+					applyExplosionWithTrack(step2predMap, currentMap, (*iter)->x, (*iter)->y);
+				}
 				//iter = bombsdeque.erase(iter);
 				++iter;
 			}
@@ -641,11 +667,7 @@ public:
 		}
 
 
-		int remains = nodesdeque_local.size();
-		if (remains == 0)
-		{
-			return true;
-		}
+		
 
 		if (bombs == 0) {
 			// no more bombs
@@ -655,7 +677,7 @@ public:
 		//prioritize bounded nodes - because they could be isolates - such that two nodes could not be eliminated with one bomb due to obstruction,
 		//so eliminating them early allows algorithm to move forward.
 		
-		//int desiredCount = std::max({ remains / bombs, 1 });
+		int desiredCount = std::max({ remains / bombs, 1 });
 		
 
 		//now place a bomb in free space
@@ -669,7 +691,7 @@ public:
 					shared_ptr<Possibility> possibility = make_shared<Possibility>((int)x, (int)y, frame + 1, frame + 3);
 					int count = calcScore(predictedMap, possibility, x, y);
 
-					if (count == remains || count >= 1) {
+					if (count == remains || count >= desiredCount) {
 						possibles.push_back(possibility);
 					}
 				}
@@ -679,27 +701,62 @@ public:
 		sort(possibles.begin(), possibles.end(), [](const shared_ptr<Possibility>& a, const shared_ptr<Possibility>& b) { return b->score < a->score; });
 		
 		//take best possibility
-		for (shared_ptr<Possibility> possible : possibles) 
+		if (possibles.size())
 		{
-			//if (possibles[0]->score > 0) {//reduntant check
-				seq.push_back(possible);
+			deque<shared_ptr<Possibility>> locposdeque;
+			locposdeque.push_back(possibles[0]);
+		    locposdeque.push_back(make_shared<Possibility>(true, frame + 1, frame + 1));
+
+			for( shared_ptr<Possibility> possible: locposdeque) {
+
+				seq.push_back(possibles[0]);
+				//seq.push_back(shared_ptr<Possibility>(new Possibility(true, frame + 1, frame + 3)));
 
 				//clone
 				nodesdesque_t nodesdeque_local;
 				copy_gm(nodes.begin(), nodes.end(), back_inserter(nodesdeque_local));
 
-				//int newbombs = bombs - 1;
-				bombs--;
-				bool solution = simulate(frame + 1, bombs, nodesdeque_local, seq);
+				int newbombs;
+				if(possible->b_wait)
+				{
+					newbombs = bombs;
+				}
+				else
+					newbombs = bombs - 1;
+				
+				bool solution = simulate(frame + 1, newbombs, nodesdeque_local, seq);
 				if (solution) {
 					// complete solution found !
+					
 					return solution;//seq;
 				};
 				// backtrack possibility
 				//splice(*seq, idx, (*seq).size());
-				bombs++;
+				
 				seq.pop_back();
-			//}
+			}
+		}
+		else
+		{
+			seq.push_back(shared_ptr<Possibility>(new Possibility(true, frame + 1, frame + 1)));
+
+			//clone
+			nodesdesque_t nodesdeque_local;
+			copy_gm(nodes.begin(), nodes.end(), back_inserter(nodesdeque_local));
+
+			//int newbombs = bombs - 1;
+
+			bool solution = simulate(frame + 1, bombs, nodesdeque_local, seq);
+			if (solution) {
+				// complete solution found !
+
+				return solution;//seq;
+			};
+			// backtrack possibility
+			//splice(*seq, idx, (*seq).size());
+
+			seq.pop_back();
+
 		}
 
 		//if (bombs > 0)
@@ -1274,7 +1331,14 @@ int main()
 			deque<shared_ptr<Possibility>>::iterator it = find_if(game.possibles.begin(), game.possibles.end(), [&simrounds](const shared_ptr<Possibility>& bomb) { return bomb->roundPlaced - 1 == simrounds; });
 			if (it != game.possibles.end())
 			{
-				cout << (*it)->x  << " " << (*it)->y << endl;
+				if (!(*it)->b_wait)
+				{
+					cout << (*it)->x << " " << (*it)->y << endl;
+				}
+				else
+				{
+					std::cout << "WAIT" << std::endl;
+				}
 				it = game.possibles.erase(it);
 			}
 		}
