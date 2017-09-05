@@ -1161,7 +1161,7 @@ public:
 int main()
 {
 
-	bool real = false;
+	bool real = true;
 
 	int width; // width of the firewall grid
 	int height; // height of the firewall grid
@@ -1312,6 +1312,7 @@ int main()
 		default:
 			//game.simulate(simrounds, bombs);
 			if (game.possibles.size() == 0) {
+			    cerr <<  "simulate" << std::endl;
 				game.simulate(simrounds, bombs, game.nodesdeque, game.possibles);
 			}
 			break;
@@ -1330,16 +1331,15 @@ int main()
 				if (!(*it)->b_wait)
 				{
 					cout << (*it)->x << " " << (*it)->y << endl;
-					
-					if (!real)
-					{
-						bombs--;
-					}
+					it = game.possibles.erase(it);
+									
 				}
 				else
 				{
 					std::cout << "WAIT" << std::endl;
+					cerr <<  "was WAIT" << std::endl;
 					it = game.possibles.erase(it);
+					cerr << game.possibles.empty() << std::endl;
 				}
 				
 			}
@@ -1348,14 +1348,7 @@ int main()
 		
 
 		simrounds++;
-		if (!real)
-		{
-			if (simrounds > 30)
-			{
-				return 1;
-			}
-		}
-
+		
 	}
 
 
