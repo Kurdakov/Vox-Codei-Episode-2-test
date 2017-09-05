@@ -547,7 +547,7 @@ public:
 
 	bool simulate(int frame, int bombs, nodesdesque_t& nodes, deque<shared_ptr<Possibility>>& seq)
 	{
-		
+
 		
 		if (frame >= rounds)
 		{
@@ -581,6 +581,7 @@ public:
 				if (!(*iter)->b_wait)
 				{
 					applyExplosionWithTrack(currentMap, currentMap, (*iter)->x, (*iter)->y);
+					bombs--;
 				}
 				//iter = bombsdeque.erase(iter);
 				++iter;
@@ -590,15 +591,22 @@ public:
 				++iter;
 			}
 		}
-		nodesdesque_t nodesdeque_local;
+		nodesdesque_t nodesdeque_local = {};
 		//copy nodes
 		nodes.erase(remove_if(nodes.begin(), nodes.end(), [](const shared_ptr<Node>& pNode) { return pNode->b_eliminated; }), nodes.end());
-
+		
 		int remains = nodes.size();
 		if (remains == 0)
 		{
 			return true;
 		}
+
+		if (bombs == 0)
+		{
+			return false;
+		}
+
+		
 
 		copy_gm(nodes.begin(), nodes.end(), back_inserter(nodesdeque_local));
 
@@ -710,24 +718,17 @@ public:
 			for( shared_ptr<Possibility> possible: locposdeque) {
 
 				seq.push_back(possibles[0]);
-				//seq.push_back(shared_ptr<Possibility>(new Possibility(true, frame + 1, frame + 3)));
 
 				//clone
-				nodesdesque_t nodesdeque_local;
-				copy_gm(nodes.begin(), nodes.end(), back_inserter(nodesdeque_local));
+				nodesdesque_t nodesdeque_local2;
+				copy_gm(nodes.begin(), nodes.end(), back_inserter(nodesdeque_local2));
 
 				int newbombs;
-				if(possible->b_wait)
-				{
-					newbombs = bombs;
-				}
-				else
-					newbombs = bombs - 1;
 				
-				bool solution = simulate(frame + 1, newbombs, nodesdeque_local, seq);
+				
+				bool solution = simulate(frame + 1, bombs, nodesdeque_local2, seq);
 				if (solution) {
 					// complete solution found !
-					
 					return solution;//seq;
 				};
 				// backtrack possibility
@@ -1171,8 +1172,8 @@ int main()
 	}
 	else
 	{
-		width = 16;
-		height = 12;
+		width = 12;
+		height = 9;
 	}
 
 	//cin >> width >> height; cin.ignore();
@@ -1199,8 +1200,8 @@ int main()
 
   if (!real)
 	{
-		rounds = 100;
-		bombs = 10;
+		rounds = 30;
+		bombs = 1;
 	}
 
 	while (1) {
@@ -1220,7 +1221,11 @@ int main()
 				initList.push_back(mapRow);
 			}
 		}
-       		
+        else
+		{
+			rounds = 30;
+		}
+		
 
 		int preventInfinite = 100;
 
@@ -1231,19 +1236,16 @@ int main()
 			{
 				initList =
 				{
-					"##..@...##@@@.@@",
-					"##.....#.##..@..",
-					"..#...#..#######",
-					"...#@#...##@...#",
-					"@..@.@..@#....#.",
-					"...#@#####...#..",
-					"..#...#...#@#...",
-					".#....#@..@.@..@",
-					"#...@.##..#@#...",
-					"#######@##...#..",
-					"......@.@#....##",
-					"@.........#@..#.",
-					
+					"............",
+					"............",
+					"............",
+					"............",
+					".@..........",
+					"............",
+					"............",
+					"............",
+					"............",
+				
 				};
 			}
 			//init
@@ -1255,19 +1257,15 @@ int main()
 			if (!real)
 			{
 				initList = {
-					"##.@....##@@@.@@",
-					"##.....#.##.@...",
-					"..#...#..#######",
-					"...#@#..@##.@..#",
-					"...@.@...#....#.",
-					"@..#@#####...#..",
-					"..#...#@..#@#...",
-					".#....#...@.@...",
-					"#..@..##..#@#..@",
-					"#######@##...#..",
-					"......@.@#....##",
-					".@........#.@.#.",
-
+					"............",
+					"............",
+					"............",
+					"............",
+					"..@.........",
+					"............",
+					"............",
+					"............",
+					"............",
 				};
 			}
 			//add second frame
@@ -1278,18 +1276,16 @@ int main()
 			if (!real)
 			{
 				initList = {
-					"##@.....##@@@.@@",
-					"##.....#.##@....",
-					"..#...#.@#######",
-					"...#@#...##..@.#",
-					"...@.@...#....#.",
-					"...#@#####...#..",
-					"@.#...#...#@#...",
-					".#....#@..@.@...",
-					"#.@...##..#@#...",
-					"#######@##...#.@",
-					"......@.@#....##",
-					"..@.......#..@#.",
+					"............",
+					"............",
+					"............",
+					"............",
+					"...@........",
+					"............",
+					"............",
+					"............",
+					"............",
+					
 				};
 			}
 			pDetection->addFrame(initList);
@@ -1334,12 +1330,18 @@ int main()
 				if (!(*it)->b_wait)
 				{
 					cout << (*it)->x << " " << (*it)->y << endl;
+					
+					if (!real)
+					{
+						bombs--;
+					}
 				}
 				else
 				{
 					std::cout << "WAIT" << std::endl;
+					it = game.possibles.erase(it);
 				}
-				it = game.possibles.erase(it);
+				
 			}
 		}
 		
@@ -1348,7 +1350,7 @@ int main()
 		simrounds++;
 		if (!real)
 		{
-			if (simrounds > 100)
+			if (simrounds > 30)
 			{
 				return 1;
 			}
